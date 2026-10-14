@@ -56,6 +56,15 @@ L'app appelle d'abord HDX HAPI directement. Si le navigateur bloque l'appel (COR
 - `npm run dev` et `npm run preview` (`vite.config.ts`) ;
 - **Netlify** (`netlify.toml`) et **Vercel** (`vercel.json`).
 
+### Cloudflare
+
+Cloudflare ne sait pas relayer vers un autre site avec une simple règle de redirection : le relais est une petite fonction, déjà incluse.
+
+- **Cloudflare Pages** (projet relié au dépôt GitHub) : commande de build `npm run build`, dossier de sortie `dist`. Le dossier `functions/` est détecté automatiquement et crée `/hapi-proxy/*`. Ajouter `VITE_HAPI_APP_IDENTIFIER` dans *Settings → Variables and Secrets*, puis redéployer (la variable est intégrée au moment du build).
+- **Cloudflare Workers** : `npm run build` puis `npx wrangler deploy` (configuration dans `wrangler.jsonc`, code dans `cloudflare/worker.ts`).
+
+Le relais n'accepte que des lectures `GET` sur `/api/...` de HDX HAPI.
+
 Pour un autre hébergeur, ajouter une réécriture `/hapi-proxy/*` vers `https://hapi.humdata.org/*`. Le mode peut être forcé dans Admin (direct / proxy).
 
 ## Déploiement

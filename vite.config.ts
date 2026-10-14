@@ -45,5 +45,5 @@ export default defineConfig({
   ],
   server: { proxy },
   preview: { proxy },
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  test: { environment: 'node', include: ['src/**/*.test.ts', 'cloudflare/**/*.test.ts'] },
 })
