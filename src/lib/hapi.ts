@@ -142,7 +142,23 @@ async function fetchPage(base: string, appId: string, startDate: string | null, 
     const txt = await res.text().catch(() => '')
     throw new HapiError(`HTTP ${res.status} ${txt.slice(0, 200)}`, res.status, res.status >= 500 || res.status === 429)
   }
-  const json = (await res.json()) as { data?: HapiFoodPrice[] }
+  const text = await res.text()
+  if (/^\s*</.test(text)) {
+    // Page HTML au lieu de JSON : le relais /hapi-proxy n'existe pas sur cet hébergement.
+    throw new HapiError(
+      base === HAPI_PROXY
+        ? "Relais /hapi-proxy absent sur cet hébergement (page HTML reçue au lieu des données). Voir README, section « CORS et proxy »."
+        : 'Réponse HTML inattendue de HDX HAPI',
+      0,
+      false,
+    )
+  }
+  let json: { data?: HapiFoodPrice[] }
+  try {
+    json = JSON.parse(text)
+  } catch {
+    throw new HapiError('Réponse JSON invalide de HDX HAPI', 0, false)
+  }
   if (!json || !Array.isArray(json.data)) throw new HapiError('Format de réponse inattendu', 0, false)
   return json.data
 }
@@ -159,7 +175,7 @@ export async function fetchAllFoodPrices(opts: {
   onProgress?: (n: number) => void
 }): Promise<{ rows: HapiFoodPrice[]; via: string }> {
   const bases = opts.mode === 'direct' ? [HAPI_DIRECT] : opts.mode === 'proxy' ? [HAPI_PROXY] : [HAPI_DIRECT, HAPI_PROXY]
-  let lastErr: unknown
+  const errors: string[] = []
   for (const base of bases) {
     try {
       const rows: HapiFoodPrice[] = []
@@ -171,10 +187,15 @@ export async function fetchAllFoodPrices(opts: {
       }
       return { rows, via: base }
     } catch (e) {
-      lastErr = e
+      if (opts.signal?.aborted) throw e
       // Erreur HTTP explicite (403 identifiant, 400…) : inutile d'essayer le proxy.
       if (e instanceof HapiError && e.status > 0 && e.status !== 404) throw e
+      const label = base === HAPI_PROXY ? 'Relais' : 'Direct'
+      // "Failed to fetch" en direct = appel bloqué par le navigateur (CORS) ou réseau indisponible.
+      const msg = e instanceof TypeError ? 'appel bloqué par le navigateur (CORS) ou réseau indisponible' : (e as Error).message
+      errors.push(`${label} : ${msg}`)
     }
   }
-  throw lastErr
+  // Non transitoire : inutile de réessayer tant que l'hébergement n'est pas corrigé.
+  throw new HapiError(errors.join(' — '), 0, false)
 }

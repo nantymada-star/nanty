@@ -39,3 +39,19 @@ describe('encodeAppIdentifier', () => {
     expect(atob(encodeAppIdentifier('MadaPrice', 'a@b.mg'))).toBe('MadaPrice:a@b.mg')
   })
 })
+
+describe('fetchAllFoodPrices — erreurs d’hébergement', () => {
+  it('explique clairement quand le direct est bloqué et que le relais renvoie une page HTML', async () => {
+    const { fetchAllFoodPrices } = await import('./hapi')
+    const orig = globalThis.fetch
+    globalThis.fetch = (async (url: string) => {
+      if (String(url).startsWith('https://')) throw new TypeError('Failed to fetch')
+      return new Response('<!doctype html><html></html>', { status: 200, headers: { 'content-type': 'text/html' } })
+    }) as typeof fetch
+    try {
+      await expect(fetchAllFoodPrices({ appId: 'x', startDate: null, mode: 'auto' })).rejects.toThrow(/CORS.*Relais \/hapi-proxy absent/)
+    } finally {
+      globalThis.fetch = orig
+    }
+  })
+})
