@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/hapi-proxy/:path*", "destination": "https://hapi.humdata.org/:path*" },
+    { "source": "/((?!assets/|hapi-proxy/).*)", "destination": "/index.html" }
+  ]
+}

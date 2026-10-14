@@ -1,0 +1,129 @@
+import { useEffect, lazy, Suspense } from 'react'
+import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useT } from './i18n'
+import { Icon } from './components/Icon'
+import { DataProvider } from './lib/data'
+import { db } from './lib/db'
+import { useSettings } from './lib/settings'
+import { syncIfDue, syncWfp } from './lib/sync'
+import Home from './pages/Home'
+import Onboarding from './pages/Onboarding'
+
+const Compare = lazy(() => import('./pages/Compare'))
+const Product = lazy(() => import('./pages/Product'))
+const MapPage = lazy(() => import('./pages/MapPage'))
+const ShopPage = lazy(() => import('./pages/ShopPage'))
+const RoutePage = lazy(() => import('./pages/RoutePage'))
+const Regions = lazy(() => import('./pages/Regions'))
+const Search = lazy(() => import('./pages/Search'))
+const Seasons = lazy(() => import('./pages/Seasons'))
+const Simulator = lazy(() => import('./pages/Simulator'))
+const Alerts = lazy(() => import('./pages/Alerts'))
+const Submit = lazy(() => import('./pages/Submit'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Merchant = lazy(() => import('./pages/Merchant'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+
+/** Planification : au démarrage, toutes les N minutes, au retour du réseau et au retour sur l'onglet. */
+function useAutoSync() {
+  const s = useSettings()
+  useEffect(() => {
+    if (!s.onboarded) return
+    const every = Math.max(5, s.autoSyncMinutes)
+    syncIfDue(every, 'auto')
+    const i = setInterval(() => syncIfDue(every, 'interval'), 60000)
+    const online = () => syncWfp('online')
+    const vis = () => document.visibilityState === 'visible' && syncIfDue(every, 'visible')
+    window.addEventListener('online', online)
+    document.addEventListener('visibilitychange', vis)
+    return () => {
+      clearInterval(i)
+      window.removeEventListener('online', online)
+      document.removeEventListener('visibilitychange', vis)
+    }
+  }, [s.onboarded, s.autoSyncMinutes, s.appId, s.hapiMode])
+}
+
+function useTheme() {
+  const { theme, lang } = useSettings()
+  useEffect(() => {
+    const el = document.documentElement
+    if (theme === 'auto') el.removeAttribute('data-theme')
+    else el.setAttribute('data-theme', theme)
+    el.lang = lang
+  }, [theme, lang])
+}
+
+function Shell() {
+  const { t } = useT()
+  const unread = useLiveQuery(() => db.notifications.filter((n) => !n.read).count(), []) ?? 0
+  const nav: [string, string, Parameters<typeof t>[0]][] = [
+    ['/', 'home', 'navHome'],
+    ['/hitady', 'search', 'navSearch'],
+    ['/sarintany', 'map', 'navMap'],
+    ['/vanim-potoana', 'calendar', 'navSeasons'],
+    ['/kajy', 'calc', 'navSim'],
+    ['/fanairana', 'bell', 'navAlerts'],
+    ['/mombamomba', 'user', 'navProfile'],
+  ]
+  return (
+    <div className="app">
+      <header className="topbar">
+        <Link to="/" className="brand" aria-label="MadaPrice">
+          <img src="/icon.svg" width={28} height={28} alt="" />
+          <span>Mada<b>Price</b></span>
+        </Link>
+        <span className="spacer" />
+        <Link className="icon" to="/hitady" aria-label={t('navSearch')}><Icon name="search" /></Link>
+        <Link className="icon" to="/fanairana" aria-label={t('notifications')}>
+          <Icon name="bell" />
+          {unread > 0 && <span className="badge-dot">{unread > 9 ? '9+' : unread}</span>}
+        </Link>
+      </header>
+      <nav className="bottomnav" aria-label="Navigation">
+        {nav.map(([to, ic, key]) => (
+          <NavLink key={to} to={to} end={to === '/'}>
+            <Icon name={ic} />
+            <span>{t(key)}</span>
+          </NavLink>
+        ))}
+      </nav>
+      <main className="main">
+        <Suspense fallback={<div className="empty"><span className="spinner" /> {t('loading')}</div>}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/vidiny" element={<Compare />} />
+            <Route path="/vokatra/:code" element={<Product />} />
+            <Route path="/sarintany" element={<MapPage />} />
+            <Route path="/fivarotana/:type/:id" element={<ShopPage />} />
+            <Route path="/dia" element={<RoutePage />} />
+            <Route path="/faritra" element={<Regions />} />
+            <Route path="/hitady" element={<Search />} />
+            <Route path="/vanim-potoana" element={<Seasons />} />
+            <Route path="/kajy" element={<Simulator />} />
+            <Route path="/fanairana" element={<Alerts />} />
+            <Route path="/hanome-vidiny" element={<Submit />} />
+            <Route path="/mombamomba" element={<Profile />} />
+            <Route path="/mpivarotra" element={<Merchant />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/fiarovana" element={<Privacy />} />
+            <Route path="*" element={<Home />} />
+          </Routes>
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+
+export default function App() {
+  const s = useSettings()
+  useTheme()
+  useAutoSync()
+  return (
+    <BrowserRouter>
+      <DataProvider>{s.onboarded ? <Shell /> : <Onboarding />}</DataProvider>
+    </BrowserRouter>
+  )
+}
