@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
-import { Empty, PageHeader, StatusBadge, useFreshness, useOnline } from '../components/ui'
+import { Change, Empty, PageHeader, StatusBadge, useFreshness, useOnline } from '../components/ui'
 import { useData } from '../lib/data'
 import { fetchRoute } from '../lib/geo'
 import { haversineKm, median } from '../lib/stats'
@@ -33,13 +33,16 @@ export default function Regions() {
   const [busy, setBusy] = useState(false)
 
   const byRegion = useMemo(() => {
-    const m = new Map<string, number[]>()
+    const m = new Map<string, { p: number[]; ch: number[] }>()
     for (const s of group) {
-      const a = m.get(s.latest.admin1) ?? []
-      a.push(s.latest.price)
+      const a = m.get(s.latest.admin1) ?? { p: [], ch: [] }
+      a.p.push(s.latest.price)
+      if (s.change1 != null) a.ch.push(s.change1)
       m.set(s.latest.admin1, a)
     }
-    return [...m.entries()].map(([r, xs]) => ({ r, med: median(xs)!, n: xs.length })).sort((a, b) => a.med - b.med)
+    return [...m.entries()]
+      .map(([r, x]) => ({ r, med: median(x.p)!, ch: median(x.ch), n: x.p.length }))
+      .sort((a, b) => a.med - b.med)
   }, [group])
 
   const rows = useMemo(() => {
@@ -106,10 +109,19 @@ export default function Regions() {
         <table className="table">
           <tbody>
             {byRegion.map((r) => (
-              <tr key={r.r}><td>{r.r || '—'}</td><td className="num" style={{ textAlign: 'right' }}><b>{fmtAr(r.med)}</b> <small>/ {unitLabel(u, lang)} · {r.n} {t('markets')}</small></td></tr>
+              <tr key={r.r}>
+                <td>{r.r || '—'}<div><small>{r.n} {t('markets')}</small></div></td>
+                <td className="num" style={{ textAlign: 'right' }}><b className="price" style={{ fontSize: 15 }}>{fmtAr(r.med)}</b> <small>/ {unitLabel(u, lang)}</small></td>
+                <td style={{ textAlign: 'right', width: 90 }}><Change v={r.ch} /></td>
+              </tr>
             ))}
           </tbody>
         </table>
+        <small>{t('regionChange')} · {t('vsPrev')}</small>
+        <div className="grid2" style={{ marginTop: 10 }}>
+          <Link className="btn small ghost" to="/sarintany"><Icon name="map" size={16} /> {t('seeMap')}</Link>
+          <Link className="btn small" to={`/kajy?c=${encodeURIComponent(c?.code ?? '')}&unit=${encodeURIComponent(u)}`}><Icon name="calc" size={16} /> {t('qSim')}</Link>
+        </div>
       </div>
 
       {buy && (

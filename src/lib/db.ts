@@ -74,8 +74,13 @@ export interface PriceAlert {
   marketCode: string | '*'
   unit: string
   priceType: string
-  kind: 'rise' | 'drop' | 'below' | 'above' | 'new'
+  /** season = avant le mois le plus cher (indice saisonnier réel) ; stock = produit déclaré disponible dans un commerce */
+  kind: 'rise' | 'drop' | 'below' | 'above' | 'new' | 'season' | 'stock'
   threshold: number // % pour rise/drop, Ar pour below/above
+  /** Nom libre du produit pour les alertes « stock » (prix déclarés). */
+  product?: string
+  /** Dernière période ayant déclenché une alerte saisonnière (AAAA-MM). */
+  lastFiredPeriod?: string
   active: boolean
   createdAt: string
   lastFiredObsId?: string
@@ -125,6 +130,28 @@ export interface Shop {
   fetchedAt: string
 }
 
+/** Historique de consultation (« Tantarako »), stocké sur l'appareil uniquement. */
+export interface HistoryEntry {
+  id?: number
+  at: string
+  kind: 'product' | 'search' | 'shop'
+  key: string // code produit|marché, texte recherché ou id commerce
+  label: string
+  link: string
+}
+
+/** Fiche commerce corrigée par le commerçant (valeurs « déclarées », datées). */
+export interface ShopEdit {
+  shopId: string
+  phone?: string
+  address?: string
+  hours?: string
+  delivery?: 'yes' | 'no' | ''
+  deliveryArea?: string
+  updatedAt: string
+  updatedBy: string
+}
+
 export interface KV {
   key: string
   value: unknown
@@ -141,6 +168,8 @@ export const db = new Dexie('madaprice') as Dexie & {
   shopPrices: EntityTable<ShopPrice, 'id'>
   shops: EntityTable<Shop, 'id'>
   kv: EntityTable<KV, 'key'>
+  history: EntityTable<HistoryEntry, 'id'>
+  shopEdits: EntityTable<ShopEdit, 'shopId'>
 }
 
 db.version(1).stores({
@@ -156,6 +185,40 @@ db.version(1).stores({
   shops: 'id, kind, fetchedAt',
   kv: 'key',
 })
+
+db.version(2).stores({
+  history: '++id, at, kind, key',
+  shopEdits: 'shopId',
+})
+
+/** Ajoute une consultation à l'historique (une seule entrée par élément, la plus récente). */
+export async function recordHistory(e: Omit<HistoryEntry, 'id' | 'at'>) {
+  try {
+    await db.transaction('rw', db.history, async () => {
+      await db.history.where('key').equals(e.key).filter((x) => x.kind === e.kind).delete()
+      await db.history.add({ ...e, at: new Date().toISOString() })
+      const n = await db.history.count()
+      if (n > 300) {
+        const old = await db.history.orderBy('at').limit(n - 300).primaryKeys()
+        await db.history.bulkDelete(old)
+      }
+    })
+  } catch {
+    /* l'historique est une commodité : ne jamais bloquer l'écran */
+  }
+}
+
+/** Nombre de consultations d'une fiche commerce sur cet appareil (statistiques locales). */
+export async function shopViewCount(shopId: string) {
+  return db.kv.get('views:' + shopId).then((r) => (r?.value as number) ?? 0)
+}
+export async function bumpShopView(shopId: string) {
+  try {
+    await db.kv.put({ key: 'views:' + shopId, value: (await shopViewCount(shopId)) + 1 })
+  } catch {
+    /* ignore */
+  }
+}
 
 export async function getKV<T>(key: string, fallback: T): Promise<T> {
   const row = await db.kv.get(key)

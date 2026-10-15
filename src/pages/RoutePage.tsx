@@ -34,7 +34,11 @@ export default function RoutePage() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<Mode>('car')
-  const [costKm, setCostKm] = useState<string>(() => localStorage.getItem('madaprice.costKm') ?? '')
+  // Tarif au km mémorisé séparément pour chaque mode (à pied : 0 par défaut)
+  const readRate = (m: Mode) => {
+    try { return localStorage.getItem('madaprice.costKm.' + m) ?? (m === 'walk' ? '0' : '') } catch { return m === 'walk' ? '0' : '' }
+  }
+  const [costKm, setCostKm] = useState<string>(() => readRate('car'))
   const [stopSel, setStopSel] = useState('')
 
   const from = s.place
@@ -101,7 +105,7 @@ export default function RoutePage() {
           {err && <div className="banner warn">{t('routeUnavailable')} <small>({err})</small></div>}
           <div className="chips">
             {(['car', 'taxi', 'moto', 'walk'] as Mode[]).map((m) => (
-              <button key={m} className={`chip ${mode === m ? 'on' : ''}`} onClick={() => setMode(m)}>
+              <button key={m} className={`chip ${mode === m ? 'on' : ''}`} onClick={() => { setMode(m); setCostKm(readRate(m)) }}>
                 {{ car: lang === 'mg' ? 'Fiara' : 'Voiture', taxi: 'Taxi', moto: 'Moto', walk: lang === 'mg' ? 'An-tongotra' : 'À pied' }[m]}
               </button>
             ))}
@@ -111,9 +115,10 @@ export default function RoutePage() {
             <div className="kpi"><div className="v num">{minutes != null ? `${fmtNum(minutes)} min` : '—'}</div><div className="l">{t('duration')}{mode === 'walk' ? ` (4,5 km/h, ${t('stEstimated').toLowerCase()})` : mode !== 'car' ? ` (${lang === 'mg' ? 'fiara' : 'voiture'})` : ''}</div></div>
           </div>
           <label className="field"><span>{t('costPerKm')}</span>
-            <input type="number" inputMode="decimal" min={0} value={costKm} onChange={(e) => { setCostKm(e.target.value); try { localStorage.setItem('madaprice.costKm', e.target.value) } catch { /* */ } }} placeholder="Ar / km" />
+            <input type="number" inputMode="decimal" min={0} value={costKm} onChange={(e) => { setCostKm(e.target.value); try { localStorage.setItem('madaprice.costKm.' + mode, e.target.value) } catch { /* */ } }} placeholder="Ar / km" />
           </label>
-          {cost != null && <div className="row between"><span>{t('tripCost')}</span><span className="price num">{fmtAr(cost)}</span></div>}
+          <small>{t('ratePerMode')}</small>
+          {cost != null && <div className="row between"><span>{t('tripCost')} <span className="badge b-estimated">{t('stEstimated')}</span></span><span className="price num">{fmtAr(cost)}</span></div>}
           <small>{t('routeNote')}</small>
           <a className="btn secondary" href={externalDirectionsUrl(dest, from)} target="_blank" rel="noreferrer"><Icon name="map" size={18} /> {t('openExternal')}</a>
         </div>

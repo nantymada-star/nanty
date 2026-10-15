@@ -5,9 +5,12 @@ import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { Empty, PageHeader, StatusBadge } from '../components/ui'
 import { useData } from '../lib/data'
-import { db } from '../lib/db'
+import { db, recordHistory } from '../lib/db'
 import { categoryLabel, commodityLabel, matchScore, stripAccents, unitLabel } from '../lib/commodities'
-import { fmtAr, fmtDateTime, fmtMonth } from '../lib/format'
+import { fmtAr, fmtDateTime, fmtMonth, fmtNum } from '../lib/format'
+import { useSettings } from '../lib/settings'
+import { haversineKm } from '../lib/stats'
+import { isOpenNow } from '../lib/geo'
 
 type SR = { start: () => void; stop: () => void; lang: string; interimResults: boolean; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; onend: () => void; onerror: (e: { error: string }) => void }
 
@@ -19,7 +22,10 @@ export default function Search() {
   const [voiceErr, setVoiceErr] = useState('')
   const recRef = useRef<SR | null>(null)
   const { commodities, seriesList } = useData()
-  const shopPrices = useLiveQuery(() => db.shopPrices.toArray(), []) ?? []
+  const shopPricesQ = useLiveQuery(() => db.shopPrices.toArray(), [])
+  const shopsQ = useLiveQuery(() => db.shops.toArray(), [])
+  const s = useSettings()
+  const [shopSort, setShopSort] = useState<'open' | 'near' | 'cheap'>('cheap')
 
   // Retire les mots de quantité/lieu courants pour garder le produit ("vary 50 kg any Antananarivo")
   const productQuery = q.replace(/\d+\s*(kg|l|gony|sacs?|litatra|litres?)/gi, '').replace(/\b(any|ao|eto|à|a|au|de|du|des|le|la|les|akaiky|mora|indrindra|aiza|no|ahitana|où|acheter|trouve|cherche|tadiavo)\b/gi, ' ').trim()
@@ -41,8 +47,23 @@ export default function Search() {
   const declared = useMemo(() => {
     const k = stripAccents(productQuery)
     if (!k) return []
-    return shopPrices.filter((p) => stripAccents(p.product).includes(k)).slice(0, 20)
-  }, [productQuery, shopPrices])
+    const shopById = new Map((shopsQ ?? []).map((x) => [x.id, x]))
+    const rows = (shopPricesQ ?? [])
+      .filter((p) => stripAccents(p.product).includes(k))
+      .map((p) => {
+        const sh = shopById.get(p.shopId)
+        return {
+          p,
+          dist: sh && s.place ? haversineKm(s.place, sh) : null,
+          open: sh ? isOpenNow(sh.tags.opening_hours) : null,
+        }
+      })
+    const filtered = shopSort === 'open' ? rows.filter((r) => r.open === true) : rows
+    filtered.sort((a, b) =>
+      shopSort === 'near' ? (a.dist ?? 1e9) - (b.dist ?? 1e9) : a.p.price - b.p.price,
+    )
+    return filtered.slice(0, 40)
+  }, [productQuery, shopPricesQ, shopsQ, shopSort, s.place])
 
   const startVoice = () => {
     const W = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }
@@ -63,6 +84,11 @@ export default function Search() {
     setVoiceErr(''); setListening(true)
     try { rec.start() } catch (e) { setListening(false); setVoiceErr(String(e)) }
   }
+
+  const submitted = params.get('q') ?? ''
+  useEffect(() => {
+    if (submitted.trim().length > 1) recordHistory({ kind: 'search', key: submitted.trim().toLowerCase(), label: submitted.trim(), link: `/hitady?q=${encodeURIComponent(submitted.trim())}` })
+  }, [submitted])
 
   useEffect(() => {
     if (params.get('voice') === '1') startVoice()
@@ -108,20 +134,35 @@ export default function Search() {
             )}
           </div>
 
-          {declared.length > 0 && (
+          {(shopPricesQ ?? []).some((p) => stripAccents(p.product).includes(stripAccents(productQuery))) && (
             <>
               <div className="section-title"><h2>{t('declaredPrices')}</h2></div>
+              <div className="chips" role="group">
+                {([['open', 'openNow'], ['near', 'sortNear'], ['cheap', 'sortCheap']] as const).map(([k, l]) => (
+                  <button key={k} className={`chip ${shopSort === k ? 'on' : ''}`} onClick={() => setShopSort(k)} disabled={k === 'near' && !s.place}>{t(l)}</button>
+                ))}
+              </div>
               <div className="card" style={{ paddingBlock: 0 }}>
-                <ul className="list">
-                  {declared.map((p) => (
-                    <li key={p.id}>
-                      <Link className="rowlink" to={`/fivarotana/${p.shopId}`}>
-                        <div style={{ flex: 1 }}><b>{p.product}</b> · {p.shopName}<div className="row" style={{ gap: 6 }}><StatusBadge status="declared" /><small>{fmtDateTime(p.declaredAt, lang)}</small></div></div>
-                        <div className="price num">{fmtAr(p.price)}<small>/{p.unit}</small></div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {declared.length === 0 ? <Empty icon="store">{t('noResults')}</Empty> : (
+                  <ul className="list">
+                    {declared.map(({ p, dist, open }) => (
+                      <li key={p.id}>
+                        <Link className="rowlink" to={`/fivarotana/${p.shopId}`}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <b>{p.product}</b> <small>/ {p.unit}</small>
+                            <div><small><Icon name="store" size={12} /> {p.shopName}{dist != null ? ` · ${fmtNum(dist, 1)} km` : ''}{open === true ? ` · ${t('openNow')}` : open === false ? ` · ${t('closedNow')}` : ''}</small></div>
+                            <div className="row wrap" style={{ gap: 6 }}>
+                              <StatusBadge status="declared" />
+                              <span className="badge b-stale">{p.stock === 'declared' ? t('stockDeclared') : p.stock === 'out' ? t('stockOut') : t('stockUnknown')}</span>
+                              <small>{fmtDateTime(p.declaredAt, lang)}</small>
+                            </div>
+                          </div>
+                          <div className="price num">{fmtAr(p.price)}</div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </>
           )}

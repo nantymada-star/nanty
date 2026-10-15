@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -6,7 +6,7 @@ import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { Change, Empty, PageHeader, SeriesRow, StatusBadge, useFreshness } from '../components/ui'
 import { useData } from '../lib/data'
-import { db, type PriceAlert } from '../lib/db'
+import { db, recordHistory, type PriceAlert } from '../lib/db'
 import { compKey, seriesKey } from '../lib/stats'
 import { categoryLabel, commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
 import { fmtAr, fmtDateTime, fmtMonth, fmtNum, fmtPeriod, MONTHS_SHORT } from '../lib/format'
@@ -39,6 +39,19 @@ export default function Product() {
     return pts.map((p) => ({ d: p.periodStart, price: p.price }))
   }, [series, range])
 
+  const histKey = series ? `${series.latest.commodityCode}|${series.latest.marketCode}|${series.latest.unit}|${series.latest.priceType}` : ''
+  useEffect(() => {
+    if (!series) return
+    const o = series.latest
+    recordHistory({
+      kind: 'product',
+      key: histKey,
+      label: `${commodityLabel(o.commodityName, lang)} · ${o.marketName}`,
+      link: `/vokatra/${encodeURIComponent(o.commodityCode)}?market=${encodeURIComponent(o.marketCode)}&unit=${encodeURIComponent(o.unit)}&pt=${encodeURIComponent(o.priceType)}`,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [histKey])
+
   if (!series) {
     return (
       <div>
@@ -48,6 +61,9 @@ export default function Product() {
     )
   }
   const o = series.latest
+  const wholesale = o.priceType !== 'Wholesale'
+    ? seriesList.find((x) => x.latest.commodityCode === o.commodityCode && x.latest.marketCode === o.marketCode && x.latest.priceType === 'Wholesale')
+    : undefined
   const others = seriesList.filter((s) => compKey(s.latest) === compKey(o) && s.key !== series.key).sort((a, b) => a.latest.price - b.latest.price)
   const marketsForCommodity = forCommodity.filter((s, i, a) => a.findIndex((x) => x.key === s.key) === i)
 
@@ -110,6 +126,22 @@ export default function Product() {
           <Link className="btn small secondary" to={`/kajy?buy=${o.price}&c=${encodeURIComponent(code)}&unit=${encodeURIComponent(o.unit)}`}><Icon name="calc" size={16} /> {t('simulate')}</Link>
           <Link className="btn small ghost" to={`/vidiny?c=${encodeURIComponent(code)}&unit=${encodeURIComponent(o.unit)}&pt=${encodeURIComponent(o.priceType)}`}><Icon name="chart" size={16} /> {t('qCompare')}</Link>
         </div>
+      </div>
+
+      <div className="card stack">
+        <h2>{t('byQuantity')}</h2>
+        <table className="table">
+          <tbody>
+            {(o.unit === 'kg' ? [1, 10, 50] : o.unit === 'L' ? [1, 5, 20] : [1, 10]).map((q) => (
+              <tr key={q}><td>{q} {unitLabel(o.unit, lang)}</td><td className="num" style={{ textAlign: 'right' }}><b>{fmtAr(o.price * q)}</b> <span className="badge b-estimated">{t('stEstimated')}</span></td></tr>
+            ))}
+            {wholesale && (
+              <tr><td>{t('wholesaleHere')} <div><small>{fmtPeriod(wholesale.latest.periodStart, wholesale.latest.periodEnd, lang)}</small></div></td>
+                <td className="num" style={{ textAlign: 'right' }}><b>{fmtAr(wholesale.latest.price)}</b> / {unitLabel(wholesale.latest.unit, lang)} <StatusBadge status={fresh(wholesale.latest)} /></td></tr>
+            )}
+          </tbody>
+        </table>
+        <small>{t('qtyNote')}</small>
       </div>
 
       <div className="card">

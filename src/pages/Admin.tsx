@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { median } from '../lib/stats'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
@@ -9,7 +11,7 @@ import { updateSettings, useSettings } from '../lib/settings'
 import { encodeAppIdentifier } from '../lib/hapi'
 import { SOURCE_WFP, syncWfp, useSyncState } from '../lib/sync'
 import { categoryLabel, commodityLabel } from '../lib/commodities'
-import { fmtAr, fmtDateTime, fmtMonth, fmtNum } from '../lib/format'
+import { fmtAr, fmtDateTime, fmtMonth, fmtNum, MONTHS_SHORT } from '../lib/format'
 
 interface AuditEntry { at: string; who: string; action: string; target: string }
 
@@ -41,6 +43,34 @@ export default function Admin() {
     await syncWfp('full-resync')
   }
 
+  // Courbe d'évolution : médiane nationale mensuelle (détail) des 3 produits les plus suivis, en indice 100 = 1er mois.
+  const trend = useMemo(() => {
+    const top = commodities.slice(0, 3)
+    const months = new Map<string, Record<string, number>>()
+    for (const c of top) {
+      const unit = c.units.includes('kg') ? 'kg' : c.units[0]
+      const byMonth = new Map<string, number[]>()
+      for (const o of observations) {
+        if (o.source !== 'wfp-hapi' || o.suspect || o.commodityCode !== c.code || o.unit !== unit || o.priceType !== 'Retail') continue
+        const k = o.periodStart.slice(0, 7)
+        const a = byMonth.get(k) ?? []
+        a.push(o.price)
+        byMonth.set(k, a)
+      }
+      const keys = [...byMonth.keys()].sort().slice(-12)
+      const base = keys.length ? median(byMonth.get(keys[0])!)! : 0
+      for (const k of keys) {
+        const row = months.get(k) ?? {}
+        const med = median(byMonth.get(k)!)!
+        row[c.code] = base ? Math.round((med / base) * 1000) / 10 : 0
+        row[c.code + ':ar'] = med
+        months.set(k, row)
+      }
+    }
+    return { top, data: [...months.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([m, v]) => ({ m, ...v })) }
+  }, [commodities, observations])
+  const COLORS = ['var(--green2)', 'var(--red)', 'var(--orange)']
+
   const perCat = Object.entries(
     observations.reduce<Record<string, number>>((a, o) => ((a[o.category] = (a[o.category] ?? 0) + 1), a), {}),
   ).sort((a, b) => b[1] - a[1])
@@ -57,6 +87,30 @@ export default function Admin() {
         <KPI v={fmtNum(commodities.length)} l={t('products')} />
         <KPI v={fmtNum(regions.length)} l={t('region')} />
       </div>
+
+      {trend.data.length > 1 && (
+        <div className="card">
+          <h2 style={{ marginBottom: 6 }}>{t('priceTrend')}</h2>
+          <div style={{ width: '100%', height: 220 }}>
+            <ResponsiveContainer>
+              <LineChart data={trend.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="m" tickFormatter={(m: string) => `${MONTHS_SHORT[lang][Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`} tick={{ fontSize: 11, fill: 'var(--muted)' }} minTickGap={20} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--muted)' }} width={36} domain={['auto', 'auto']} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}
+                  formatter={(v: number, key: string, item: { payload?: Record<string, number> }) => [`${v} (${fmtAr(item.payload?.[key + ':ar'] ?? 0)})`, commodityLabel(trend.top.find((c) => c.code === key)?.name ?? key, lang)]}
+                />
+                {trend.top.map((c, i) => <Line key={c.code} type="monotone" dataKey={c.code} stroke={COLORS[i]} strokeWidth={2} dot={false} isAnimationActive={false} />)}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="legend-row">
+            {trend.top.map((c, i) => <span key={c.code}><span className="dot" style={{ background: COLORS[i] }} /> {commodityLabel(c.name, lang)}</span>)}
+          </div>
+          <small>100 = {lang === 'mg' ? 'volana voalohany' : 'premier mois'} · WFP, {lang === 'mg' ? 'antsinjarany' : 'détail'}</small>
+        </div>
+      )}
 
       <div className="card stack">
         <h2>{t('sources')}</h2>

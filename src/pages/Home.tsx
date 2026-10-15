@@ -34,14 +34,25 @@ export default function Home() {
   }, [seriesList, s.place])
 
   const nowMs = Date.now()
+  // Les 8 catégories de la maquette. Sans prix WFP (matériaux, intrants agricoles), on cherche dans les commerces OSM.
+  const cats: [string, string, Parameters<typeof t>[0], string, string][] = [
+    ['/vidiny?cat=' + encodeURIComponent('cereals and tubers'), 'leaf', 'catCereals', 'var(--orange-soft)', 'var(--orange)'],
+    ['/sarintany?q=' + encodeURIComponent('ciment'), 'layers', 'catBuild', 'var(--blue-soft)', 'var(--blue)'],
+    ['/sarintany?q=' + encodeURIComponent('zezika'), 'leaf', 'catFarm', 'var(--leaf)', 'var(--green2)'],
+    ['/vidiny?cat=' + encodeURIComponent('meat, fish and eggs'), 'store', 'catLivestock', 'var(--blue-soft)', 'var(--blue)'],
+    ['/vidiny?cat=' + encodeURIComponent('miscellaneous food,oil and fats,pulses and nuts,vegetables and fruits'), 'store', 'catDaily', 'var(--orange-soft)', 'var(--orange)'],
+    ['/kajy', 'calc', 'qSim', 'var(--leaf)', 'var(--green2)'],
+    ['/sarintany', 'map', 'qShops', 'var(--orange-soft)', 'var(--orange)'],
+    ['/vanim-potoana', 'calendar', 'qSeasons', 'var(--leaf)', 'var(--green2)'],
+  ]
   const tiles: [string, string, Parameters<typeof t>[0]][] = [
     ['/vidiny', 'chart', 'qCompare'],
     ['/faritra', 'truck', 'qRegions'],
-    ['/sarintany', 'store', 'qShops'],
-    ['/vanim-potoana', 'calendar', 'qSeasons'],
-    ['/kajy', 'calc', 'qSim'],
+    ['/vidiny?cat=non-food', 'truck', 'catFuel'],
+    ['/fanairana', 'bell', 'navAlerts'],
     ['/hanome-vidiny', 'edit', 'qSubmit'],
     ['/mpivarotra', 'store', 'qMerchant'],
+    ['/tantarako', 'refresh', 'historyTitle'],
     ['/admin', 'settings', 'qAdmin'],
   ]
 
@@ -57,6 +68,10 @@ export default function Home() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} aria-label={t('searchPh')} style={{ color: 'var(--fg)' }} />
           <Link to="/hitady?voice=1" className="btn small secondary" aria-label={t('voice')}><Icon name="mic" size={16} /></Link>
         </form>
+        <div className="row between wrap" style={{ gap: 8 }}>
+          <span style={{ fontWeight: 600 }}>{t('heroText')}</span>
+          <Link className="btn small orange" to="/sarintany"><Icon name="map" size={16} /> {t('seeMap')}</Link>
+        </div>
         <div className="row between" style={{ fontSize: 14 }}>
           <span className="row" style={{ gap: 6 }}><Icon name="pin" size={16} /> {s.place ? s.place.name : t('allTowns')}</span>
           <button className="btn small ghost" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.35)' }} onClick={() => setPicking(!picking)}>{t('changeTown')}</button>
@@ -70,6 +85,13 @@ export default function Home() {
         <KPI v={fmtNum(markets.length)} l={t('markets')} />
         <KPI v={fmtNum(commodities.length)} l={t('products')} />
         <KPI v={fmtNum(observations.length)} l={t('observations')} />
+      </div>
+
+      <div className="section-title"><h2>{t('categories')}</h2></div>
+      <div className="grid4">
+        {cats.map(([to, ic, k, bg, fg]) => (
+          <Link key={k} to={to} className="tile cat-tile"><span className="ic" style={{ background: bg, color: fg }}><Icon name={ic} /></span>{t(k)}</Link>
+        ))}
       </div>
 
       <div className="section-title"><h2>{t('quick')}</h2></div>

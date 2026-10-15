@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
-import { Empty, PageHeader, StatusBadge, useOnline } from '../components/ui'
-import { db, type ShopPrice } from '../lib/db'
+import { Empty, KPI, PageHeader, StatusBadge, useOnline } from '../components/ui'
+import { db, shopViewCount, type ShopPrice } from '../lib/db'
+import { evaluateStockAlerts } from '../lib/seasonal'
 import { useSettings } from '../lib/settings'
 import { fetchShops } from '../lib/geo'
 import { stripAccents } from '../lib/commodities'
-import { fmtAr, fmtDateTime } from '../lib/format'
+import { fmtAgo, fmtAr, fmtDateTime, fmtNum } from '../lib/format'
 import { shopKindLabel } from './MapPage'
 
 const ALL_KINDS = ['shop=supermarket', 'shop=convenience', 'shop=general', 'shop=grocery', 'shop=wholesale', 'shop=hardware', 'shop=doityourself', 'shop=agrarian', 'shop=butcher', 'shop=bakery', 'amenity=marketplace']
@@ -35,6 +36,26 @@ export default function Merchant() {
   }
   const found = q.length > 1 ? cached.filter((x) => x.name && stripAccents(x.name).includes(stripAccents(q))).slice(0, 30) : []
 
+  const [tab, setTab] = useState<'info' | 'products' | 'stats'>('products')
+  const edit = useLiveQuery(() => (shopId ? db.shopEdits.get(shopId) : undefined), [shopId])
+  const views = useLiveQuery(() => (shopId ? shopViewCount(shopId) : 0), [shopId, tab]) ?? 0
+  const [info, setInfo] = useState({ address: '', phone: '', hours: '', delivery: '' as '' | 'yes' | 'no', deliveryArea: '' })
+  const [infoOk, setInfoOk] = useState(false)
+  useEffect(() => {
+    setInfo({ address: edit?.address ?? '', phone: edit?.phone ?? '', hours: edit?.hours ?? '', delivery: edit?.delivery ?? '', deliveryArea: edit?.deliveryArea ?? '' })
+    setInfoOk(false)
+  }, [edit])
+  const osmAddr = shop ? [shop.tags['addr:housenumber'], shop.tags['addr:street'], shop.tags['addr:city']].filter(Boolean).join(', ') : ''
+  const saveInfo = async () => {
+    if (!shop) return
+    await db.shopEdits.put({
+      shopId: shop.id,
+      address: info.address.trim(), phone: info.phone.trim(), hours: info.hours.trim(), delivery: info.delivery, deliveryArea: info.deliveryArea.trim(),
+      updatedAt: new Date().toISOString(), updatedBy: s.displayName || t('roleMerchant'),
+    })
+    setInfoOk(true)
+  }
+
   const save = async () => {
     const price = Number(form.price)
     if (!shop || !form.product.trim() || !(price > 0)) return
@@ -44,6 +65,7 @@ export default function Merchant() {
     }
     if (editId) await db.shopPrices.update(editId, row)
     else await db.shopPrices.add(row)
+    await evaluateStockAlerts(row, lang)
     setForm({ ...form, product: '', price: '' }); setEditId(null)
   }
 
@@ -78,6 +100,45 @@ export default function Merchant() {
               <button className="btn small ghost" onClick={() => setParams({})}>{t('changeTown')}</button>
             </div>
           </div>
+          <div className="chips" role="tablist">
+            {([['info', 'tabInfo'], ['products', 'tabProducts'], ['stats', 'tabStats']] as const).map(([k, l]) => (
+              <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{t(l)}</button>
+            ))}
+          </div>
+
+          {tab === 'info' && (
+            <div className="card stack">
+              <h2>{t('editInfo')}</h2>
+              <small>{t('osmData')}</small>
+              <div className="grid2">
+                <label className="field"><span>{t('address')}</span><input value={info.address} placeholder={osmAddr || '—'} onChange={(e) => setInfo({ ...info, address: e.target.value })} /></label>
+                <label className="field"><span>{t('phone')}</span><input type="tel" value={info.phone} placeholder={shop.tags.phone || shop.tags['contact:phone'] || '—'} onChange={(e) => setInfo({ ...info, phone: e.target.value })} /></label>
+                <label className="field"><span>{t('hours')}</span><input value={info.hours} placeholder={shop.tags.opening_hours || 'Mo-Fr 08:00-18:00; Sa 08:00-12:00'} onChange={(e) => setInfo({ ...info, hours: e.target.value })} /></label>
+                <label className="field"><span>{t('delivery')}</span>
+                  <select value={info.delivery} onChange={(e) => setInfo({ ...info, delivery: e.target.value as '' | 'yes' | 'no' })}>
+                    <option value="">—</option><option value="yes">{t('yes')}</option><option value="no">{t('no')}</option>
+                  </select>
+                </label>
+                <label className="field"><span>{t('deliveryArea')}</span><input value={info.deliveryArea} onChange={(e) => setInfo({ ...info, deliveryArea: e.target.value })} /></label>
+              </div>
+              {edit && <small>{t('updatedAt')} {fmtDateTime(edit.updatedAt, lang)} · {edit.updatedBy}</small>}
+              <button className="btn orange" onClick={saveInfo}><Icon name="check" size={18} /> {t('save')}</button>
+              {infoOk && <div className="banner ok"><Icon name="check" /> {t('saved')}</div>}
+            </div>
+          )}
+
+          {tab === 'stats' && (
+            <div className="stack">
+              <div className="grid3 fixed">
+                <KPI v={fmtNum(views)} l={t('shopViews')} />
+                <KPI v={fmtNum(prices.length)} l={t('pricesCount')} />
+                <KPI v={prices.length ? fmtAgo(prices.map((p) => p.declaredAt).sort().reverse()[0], lang) : '—'} l={t('updatedAt')} />
+              </div>
+              <div className="banner info"><Icon name="shield" /> {t('quotesNeedServer')}</div>
+            </div>
+          )}
+
+          {tab === 'products' && <>
           <div className="card stack">
             <h2>{editId ? t('updatedAt') : t('addPrice')}</h2>
             <div className="grid2">
@@ -118,6 +179,7 @@ export default function Merchant() {
               </ul>
             )}
           </div>
+          </>}
         </>
       )}
     </div>

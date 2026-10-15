@@ -3,7 +3,8 @@ import { BrowserRouter, Link, NavLink, Route, Routes } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useT } from './i18n'
 import { Icon } from './components/Icon'
-import { DataProvider } from './lib/data'
+import { DataProvider, useData } from './lib/data'
+import { evaluateSeasonAlerts } from './lib/seasonal'
 import { db } from './lib/db'
 import { useSettings } from './lib/settings'
 import { syncIfDue, syncWfp } from './lib/sync'
@@ -25,6 +26,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Merchant = lazy(() => import('./pages/Merchant'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Privacy = lazy(() => import('./pages/Privacy'))
+const History = lazy(() => import('./pages/History'))
 
 /** Planification : au démarrage, toutes les N minutes, au retour du réseau et au retour sur l'onglet. */
 function useAutoSync() {
@@ -56,8 +58,18 @@ function useTheme() {
   }, [theme, lang])
 }
 
+/** Alertes saisonnières : vérifiées quand les prix changent (au plus une fois par mois et par alerte). */
+function useSeasonAlerts() {
+  const { seriesList, ready } = useData()
+  const { lang } = useSettings()
+  useEffect(() => {
+    if (ready && seriesList.length) evaluateSeasonAlerts(seriesList, lang).catch(() => {})
+  }, [ready, seriesList, lang])
+}
+
 function Shell() {
   const { t } = useT()
+  useSeasonAlerts()
   const unread = useLiveQuery(() => db.notifications.filter((n) => !n.read).count(), []) ?? 0
   const nav: [string, string, Parameters<typeof t>[0]][] = [
     ['/', 'home', 'navHome'],
@@ -109,6 +121,7 @@ function Shell() {
             <Route path="/mpivarotra" element={<Merchant />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/fiarovana" element={<Privacy />} />
+            <Route path="/tantarako" element={<History />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>

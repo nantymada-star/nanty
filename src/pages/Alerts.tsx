@@ -17,6 +17,11 @@ export default function Alerts() {
   const notifs = useLiveQuery(() => db.notifications.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? []
   const alerts = useLiveQuery(() => db.alerts.toArray(), []) ?? []
   const [tab, setTab] = useState<'n' | 'a'>('n')
+  // Onglets de la maquette : type de notification
+  const [cat, setCat] = useState<'all' | 'price' | 'stock' | 'season'>('all')
+  const [product, setProduct] = useState('')
+  const catOf = (kind: string) => (kind === 'stock' ? 'stock' : kind === 'season' ? 'season' : kind === 'admin' ? 'admin' : 'price')
+  const shownNotifs = notifs.filter((n) => cat === 'all' || catOf(n.kind) === cat)
   const [c, setC] = useState('')
   const com = commodities.find((x) => x.code === c) ?? commodities[0]
   const [m, setM] = useState('*')
@@ -29,15 +34,22 @@ export default function Alerts() {
   const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
 
   const add = async () => {
+    if (kind === 'stock') {
+      if (product.trim().length < 2) return
+      await db.alerts.add({ commodityCode: '', marketCode: '*', unit: '', priceType: '', kind, product: product.trim(), threshold: 0, active: true, createdAt: new Date().toISOString() })
+      setProduct('')
+      setTab('a')
+      return
+    }
     if (!com) return
-    if (kind !== 'new' && !(Number(th) > 0)) return
-    await db.alerts.add({ commodityCode: com.code, marketCode: m, unit: u, priceType: p, kind, threshold: Number(th) || 0, active: true, createdAt: new Date().toISOString() })
+    if (!['new', 'season'].includes(kind) && !(Number(th) > 0)) return
+    await db.alerts.add({ commodityCode: com.code, marketCode: kind === 'season' ? '*' : m, unit: u, priceType: kind === 'season' ? 'Retail' : p, kind, threshold: Number(th) || 0, active: true, createdAt: new Date().toISOString() })
     setTab('a')
   }
   const kindLabel = (a: PriceAlert) => {
-    const k = { rise: 'kRise', drop: 'kDrop', below: 'kBelow', above: 'kAbove', new: 'kNew' } as const
+    const k = { rise: 'kRise', drop: 'kDrop', below: 'kBelow', above: 'kAbove', new: 'kNew', season: 'kSeason', stock: 'kStock' } as const
     const base = t(k[a.kind])
-    return a.kind === 'new' ? base : a.kind === 'rise' || a.kind === 'drop' ? `${base} ${a.threshold}` : `${base} ${fmtAr(a.threshold)}`
+    return a.kind === 'new' || a.kind === 'season' || a.kind === 'stock' ? base : a.kind === 'rise' || a.kind === 'drop' ? `${base} ${a.threshold}` : `${base} ${fmtAr(a.threshold)}`
   }
 
   return (
@@ -58,14 +70,23 @@ export default function Alerts() {
       )}
 
       {tab === 'n' && (
+        <div className="chips" role="group">
+          {([['all', 'tabAll'], ['price', 'tabPrice'], ['stock', 'tabStock'], ['season', 'tabSeason']] as const).map(([k, l]) => (
+            <button key={k} className={`chip ${cat === k ? 'on' : ''}`} onClick={() => setCat(k)}>
+              {t(l)} ({notifs.filter((n) => k === 'all' || catOf(n.kind) === k).length})
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'n' && (
         <div className="card" style={{ paddingBlock: 0 }}>
-          {notifs.length === 0 ? <Empty icon="bell">{t('noNotifs')}</Empty> : (
+          {shownNotifs.length === 0 ? <Empty icon="bell">{t('noNotifs')}</Empty> : (
             <>
               <div style={{ padding: '10px 0 0', textAlign: 'right' }}>
                 <button className="btn small ghost" onClick={() => db.notifications.toCollection().modify({ read: true })}>{t('markRead')}</button>
               </div>
               <ul className="list">
-                {notifs.map((n) => (
+                {shownNotifs.map((n) => (
                   <li key={n.id} style={{ opacity: n.read ? 0.7 : 1 }}>
                     <div className="row between">
                       <b>{!n.read && <span className="dot" style={{ background: 'var(--orange)', marginRight: 6 }} />}{n.title}</b>
@@ -89,6 +110,7 @@ export default function Alerts() {
         <>
           <div className="card stack">
             <h2>{t('createAlert')}</h2>
+            {kind !== 'stock' && <>
             <select value={com?.code ?? ''} onChange={(e) => { setC(e.target.value); setUnit(''); setPt('') }} aria-label={t('product')}>
               {commodities.map((x) => <option key={x.code} value={x.code}>{commodityLabel(x.name, lang)}</option>)}
             </select>
@@ -100,14 +122,19 @@ export default function Alerts() {
               <select value={u} onChange={(e) => setUnit(e.target.value)} aria-label={t('unit')}>{com?.units.map((x) => <option key={x} value={x}>{unitLabel(x, lang)}</option>)}</select>
               <select value={p} onChange={(e) => setPt(e.target.value)} aria-label={t('priceType')}>{com?.priceTypes.map((x) => <option key={x} value={x}>{priceTypeLabel(x, lang)}</option>)}</select>
             </div>
-            <div className="row">
-              <select value={kind} onChange={(e) => setKind(e.target.value as PriceAlert['kind'])} aria-label={t('alertKind')}>
+            </>}
+            <div className="row wrap">
+              <select style={{ flex: '1 1 160px' }} value={kind} onChange={(e) => setKind(e.target.value as PriceAlert['kind'])} aria-label={t('alertKind')}>
                 <option value="drop">{t('kDrop')}</option><option value="rise">{t('kRise')}</option>
                 <option value="below">{t('kBelow')}</option><option value="above">{t('kAbove')}</option><option value="new">{t('kNew')}</option>
+                <option value="season">{t('kSeason')}</option><option value="stock">{t('kStock')}</option>
               </select>
-              {kind !== 'new' && <input type="number" min={0} value={th} onChange={(e) => setTh(e.target.value)} aria-label={t('threshold')} />}
+              {kind === 'stock' && <input style={{ flex: '1 1 140px' }} value={product} onChange={(e) => setProduct(e.target.value)} placeholder={t('productName')} aria-label={t('productName')} />}
+              {!['new', 'season', 'stock'].includes(kind) && <input type="number" min={0} value={th} onChange={(e) => setTh(e.target.value)} aria-label={t('threshold')} />}
               <button className="btn" onClick={add}><Icon name="plus" size={16} /> {t('add')}</button>
             </div>
+            {kind === 'stock' && <small>{t('stockAlertNote')}</small>}
+            {kind === 'season' && <small>{t('seasonIndexHelp')}</small>}
           </div>
           <div className="card" style={{ paddingBlock: 0 }}>
             {alerts.length === 0 ? <Empty icon="bell">{t('noAlerts')}</Empty> : (
@@ -118,7 +145,7 @@ export default function Alerts() {
                   return (
                     <li key={a.id} className="row between">
                       <div>
-                        <b>{cc ? commodityLabel(cc.name, lang) : a.commodityCode}</b> · {mk?.name ?? t('anyMarket')}
+                        <b>{a.kind === 'stock' ? a.product : cc ? commodityLabel(cc.name, lang) : a.commodityCode}</b> · {mk?.name ?? t('anyMarket')}
                         <div><small>{kindLabel(a)} · {unitLabel(a.unit, lang)} · {priceTypeLabel(a.priceType, lang)}</small></div>
                       </div>
                       <div className="row">

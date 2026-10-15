@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useT } from '../i18n'
 import { Icon } from './Icon'
+import { Thumb } from './Thumb'
 import type { Observation } from '../lib/db'
 import { db, getKV } from '../lib/db'
 import { freshnessOf, type Freshness, type Series } from '../lib/stats'
@@ -67,6 +68,7 @@ export function SeriesRow({ s, showCommodity = true, extra, highlight }: { s: Se
   const o = s.latest
   return (
     <Link className={`rowlink${highlight ? ' new-flash' : ''}`} to={`/vokatra/${encodeURIComponent(o.commodityCode)}?market=${encodeURIComponent(o.marketCode)}&unit=${encodeURIComponent(o.unit)}&pt=${encodeURIComponent(o.priceType)}`}>
+      <Thumb category={o.category} name={o.commodityName} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 700 }}>
           {showCommodity ? commodityLabel(o.commodityName, lang) : o.marketName}

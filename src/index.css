@@ -137,3 +137,8 @@ details > summary { cursor: pointer; font-weight: 600; }
 .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .grid4 .tile { font-size: 11.5px; overflow-wrap: anywhere; hyphens: auto; }
 @media (max-width: 400px) { .grid4 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.thumb { flex: none; display: grid; place-items: center; border-radius: 12px; background: var(--soft); }
+.cat-tile .ic { width: 44px; height: 44px; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12.5px; }
+.legend-row span { display: inline-flex; align-items: center; gap: 5px; }
+.sheet { position: relative; margin-top: -70px; z-index: 500; }

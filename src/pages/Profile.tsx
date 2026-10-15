@@ -104,6 +104,9 @@ export default function Profile() {
 
       <div className="card">
         <ul className="list">
+          <li><Link className="rowlink" to="/tantarako"><Icon name="refresh" /> <span style={{ flex: 1 }}>{t('historyTitle')}</span><Icon name="chevron" /></Link></li>
+          <li><Link className="rowlink" to="/kajy"><Icon name="calc" /> <span style={{ flex: 1 }}>{t('mySims')}</span><Icon name="chevron" /></Link></li>
+          <li><Link className="rowlink" to="/fanairana"><Icon name="bell" /> <span style={{ flex: 1 }}>{t('myAlerts')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/hanome-vidiny"><Icon name="edit" /> <span style={{ flex: 1 }}>{t('submitTitle')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/mpivarotra"><Icon name="store" /> <span style={{ flex: 1 }}>{t('merchantTitle')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/admin"><Icon name="settings" /> <span style={{ flex: 1 }}>{t('adminTitle')}</span><Icon name="chevron" /></Link></li>
