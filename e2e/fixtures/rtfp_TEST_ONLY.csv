@@ -1,0 +1,4 @@
+ISO3,country,adm1_name,adm2_name,mkt_name,lat,lon,DATES,year,month,currency,o_rice,h_rice,l_rice,c_rice,inflation_rice,trust_rice,c_maize,trust_maize
+MDG,Madagascar,Analamanga,Antananarivo,Antananarivo,-18.9,47.5,2026-04-01,2026,4,MGA,,2550,2350,2450,,8,1500,7
+MDG,Madagascar,Analamanga,Antananarivo,Antananarivo,-18.9,47.5,2026-05-01,2026,5,MGA,,2600,2400,2500,,8,1550,7
+MDG,Madagascar,Ihorombe,Ihosy,Ihosy,-22.4,46.1,2026-05-01,2026,5,MGA,,2800,2500,2650,,5,,

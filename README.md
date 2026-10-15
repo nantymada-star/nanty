@@ -29,6 +29,20 @@ Autres commandes :
 | **Nominatim** | Recherche de localités (fokontany, communes…) | À la demande |
 | **FEWS NET / FAO GIEWS** | Calendrier agricole simplifié (plantation, récolte, soudure, cyclones) | Intégré, sources citées dans l'app |
 
+### Sources complémentaires (page « Angona fanampiny », `/fanampiny`)
+
+Stockées dans des tables séparées : elles enrichissent les écrans sans jamais être mélangées aux relevés WFP.
+
+| Source | Contenu | Mise à jour | Statut affiché |
+|---|---|---|---|
+| **Taux de change BFM** via [Frankfurter](https://frankfurter.dev/providers/bfm/) (`/v2/providers/bfm/rate/{devise}/MGA`, repli sur le cours agrégé) | EUR, USD, CNY, ZAR, MUR en ariary + courbe 12 mois | Automatique, au plus toutes les 6 h quand l'app est ouverte | Source et date du cours |
+| **Prix officiels** (OMH carburants, Observatoire du Riz, prix plancher vanille) | Prix, zone, date d'effet, source et lien | Saisie par l'administration (rôle Admin) | « Ofisialy » ou « Gazety » ; « Tranainy » après 45 j (carburant, riz) ou 365 j (vanille) |
+| **Banque mondiale – Real-Time Food Prices** ([catalogue 8240](https://microdata.worldbank.org/catalog/8240)) | Estimations mensuelles par marché (jusqu'à 470 marchés), fourchette basse/haute, indice de confiance | Import du fichier CSV `MDG_RTFP_mkt_*.csv` par l'administration | Toujours « Tombana » (estimation), jamais présenté comme un relevé |
+
+Valeurs initiales des prix officiels : relevées dans la presse et datées (carburants mars 2026, L'Express ; vanille verte 2026-2027, Capmad). Elles passent automatiquement en « Ancien » ; l'administrateur saisit les nouvelles valeurs, l'historique est conservé.
+
+Ces compléments apparaissent aussi dans l'accueil (taux de change), le comparateur et la fiche produit (prix officiel lié, estimations Banque mondiale pour le même produit / marché).
+
 Aucune donnée fictive n'est livrée dans l'application. Sans relevé pour un lieu, l'app le dit au lieu d'inventer un prix.
 
 ### Identifiant HDX HAPI (obligatoire pour les prix)

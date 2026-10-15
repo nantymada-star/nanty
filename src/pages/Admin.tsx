@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { median } from '../lib/stats'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { Link } from 'react-router-dom'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { KPI, PageHeader, SyncStatus } from '../components/ui'
@@ -80,6 +81,7 @@ export default function Admin() {
       <PageHeader title={t('adminTitle')} />
       {s.role !== 'admin' && <div className="banner warn"><Icon name="shield" /> <div>{t('role')} : {t('roleUser')}. <button className="btn small" onClick={() => updateSettings({ role: 'admin' })}>{t('roleAdmin')}</button></div></div>}
       <small>{t('adminLocalNote')}</small>
+      <Link className="btn secondary" to="/fanampiny?tab=official"><Icon name="globe" size={18} /> {t('enrichTitle')} : {t('tabFx')} · {t('tabOfficial')} · {t('tabWb')}</Link>
 
       <div className="grid4">
         <KPI v={fmtNum(observations.length)} l={t('observations')} />

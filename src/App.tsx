@@ -5,6 +5,8 @@ import { useT } from './i18n'
 import { Icon } from './components/Icon'
 import { DataProvider, useData } from './lib/data'
 import { evaluateSeasonAlerts } from './lib/seasonal'
+import { ensureOfficialSeeds } from './lib/official'
+import { syncFxIfDue } from './lib/fx'
 import { db } from './lib/db'
 import { useSettings } from './lib/settings'
 import { syncIfDue, syncWfp } from './lib/sync'
@@ -27,6 +29,7 @@ const Merchant = lazy(() => import('./pages/Merchant'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const History = lazy(() => import('./pages/History'))
+const Enrich = lazy(() => import('./pages/Enrich'))
 
 /** Planification : au démarrage, toutes les N minutes, au retour du réseau et au retour sur l'onglet. */
 function useAutoSync() {
@@ -67,9 +70,20 @@ function useSeasonAlerts() {
   }, [ready, seriesList, lang])
 }
 
+/** Sources complémentaires : prix officiels initiaux (une fois) et taux de change (toutes les 6 h au plus). */
+function useEnrichment() {
+  useEffect(() => {
+    ensureOfficialSeeds().catch(() => {})
+    syncFxIfDue().catch(() => {})
+    const i = setInterval(() => syncFxIfDue().catch(() => {}), 30 * 60000)
+    return () => clearInterval(i)
+  }, [])
+}
+
 function Shell() {
   const { t } = useT()
   useSeasonAlerts()
+  useEnrichment()
   const unread = useLiveQuery(() => db.notifications.filter((n) => !n.read).count(), []) ?? 0
   const nav: [string, string, Parameters<typeof t>[0]][] = [
     ['/', 'home', 'navHome'],
@@ -122,6 +136,7 @@ function Shell() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/fiarovana" element={<Privacy />} />
             <Route path="/tantarako" element={<History />} />
+            <Route path="/fanampiny" element={<Enrich />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>

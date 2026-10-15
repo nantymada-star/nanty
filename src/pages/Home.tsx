@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
+import { FxStrip } from '../components/Enrichment'
 import { Empty, KPI, PlacePicker, SeriesRow, SyncStatus } from '../components/ui'
 import { useData } from '../lib/data'
 import { useSettings } from '../lib/settings'
@@ -53,6 +54,7 @@ export default function Home() {
     ['/hanome-vidiny', 'edit', 'qSubmit'],
     ['/mpivarotra', 'store', 'qMerchant'],
     ['/tantarako', 'refresh', 'historyTitle'],
+    ['/fanampiny', 'globe', 'enrichTitle'],
     ['/admin', 'settings', 'qAdmin'],
   ]
 
@@ -80,6 +82,8 @@ export default function Home() {
       </div>
 
       <SyncStatus />
+
+      <FxStrip />
 
       <div className="grid3 fixed">
         <KPI v={fmtNum(markets.length)} l={t('markets')} />

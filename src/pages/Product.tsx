@@ -6,6 +6,7 @@ import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { Change, Empty, PageHeader, SeriesRow, StatusBadge, useFreshness } from '../components/ui'
 import { useData } from '../lib/data'
+import { CommodityEnrichment } from '../components/Enrichment'
 import { db, recordHistory, type PriceAlert } from '../lib/db'
 import { compKey, seriesKey } from '../lib/stats'
 import { categoryLabel, commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -127,6 +128,8 @@ export default function Product() {
           <Link className="btn small ghost" to={`/vidiny?c=${encodeURIComponent(code)}&unit=${encodeURIComponent(o.unit)}&pt=${encodeURIComponent(o.priceType)}`}><Icon name="chart" size={16} /> {t('qCompare')}</Link>
         </div>
       </div>
+
+      <CommodityEnrichment commodityName={o.commodityName} market={o.marketName} />
 
       <div className="card stack">
         <h2>{t('byQuantity')}</h2>

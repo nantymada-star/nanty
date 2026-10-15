@@ -36,6 +36,14 @@ await page.route('https://overpass-api.de/**', (r) => r.fulfill({ status: 200, c
   { type: 'node', id: 1, lat: -18.912, lon: 47.521, tags: { shop: 'supermarket', name: 'Test Supermarket', opening_hours: 'Mo-Su 08:00-20:00', phone: '+261 20 00 000 00' } },
   { type: 'way', id: 2, center: { lat: -18.915, lon: 47.525 }, tags: { amenity: 'marketplace', name: 'Test Tsena' } }] }) }))
 await page.route('https://router.project-osrm.org/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ code: 'Ok', routes: [{ distance: 2300, duration: 480, geometry: { coordinates: [[47.52, -18.91], [47.521, -18.912]] } }] }) }))
+await page.route('https://api.frankfurter.dev/**', (r) => {
+  const u = new URL(r.request().url())
+  const m = u.pathname.match(/rate\/([A-Z]{3})\/MGA$/)
+  const rates = { EUR: 5120.5, USD: 4400.38, CNY: 612.1, ZAR: 248.9, MUR: 96.2 }
+  const body = m ? { date: '2026-10-14', base: m[1], quote: 'MGA', rate: rates[m[1]] }
+    : [1, 2, 3, 4].map((i) => ({ date: `2026-0${5 + i}-01`, base: u.searchParams.get('base'), quote: 'MGA', rate: 4300 + i * 20 }))
+  r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) })
+})
 await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }))
 
 const shot = async (n) => { await page.waitForTimeout(500); await page.screenshot({ path: `${OUT}/${n}.png`, fullPage: true }) }
@@ -162,6 +170,30 @@ await page.getByRole('button', { name: 'Taxi' }).click()
 checks.ratePerMode = (await page.locator('input[placeholder="Ar / km"]').inputValue()) === ''
 await page.getByRole('button', { name: 'Fiara' }).click()
 checks.ratePerModeBack = (await page.locator('input[placeholder="Ar / km"]').inputValue()) === '600'
+// ---- Sources complémentaires ----
+await page.goto(B + '/mombamomba')
+await page.getByLabel('Andraikitra').selectOption('admin')
+await page.goto(B + '/fanampiny?tab=fx')
+checks.fx = await has('4\u202f400,38 Ar')
+await shot('32-enrich-fx')
+await page.goto(B + '/fanampiny?tab=official')
+checks.officialSeeds = await has('4\u202f660 Ar')
+await page.locator('input[type=number]').first().fill('4800')
+await page.locator('input[placeholder="OMH, Bulletin ODR n°…"]').fill('OMH')
+await page.locator('select').first().selectOption('fuel_gasoil')
+await page.getByRole('button', { name: 'Ampio' }).click()
+checks.officialAdd = await has('4\u202f800 Ar')
+await shot('33-enrich-official')
+await page.goto(B + '/fanampiny?tab=wb')
+await page.locator('input[type=file]').setInputFiles('e2e/fixtures/rtfp_TEST_ONLY.csv')
+checks.wbImport = await has('tombana voatahiry')
+checks.wbList = await has('Ihosy')
+await shot('34-enrich-wb')
+await page.goto(B + '/vidiny?c=52')
+checks.compareEnrich = await has('Tombana Banky Iraisam-pirenena ho an')
+await shot('35-compare-enrich')
+await page.goto(B + '/')
+checks.homeFx = await has('1 USD')
 console.log('CHECKS ' + JSON.stringify(checks))
 
 await page.goto(B + '/mombamomba')

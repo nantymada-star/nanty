@@ -152,6 +152,52 @@ export interface ShopEdit {
   updatedBy: string
 }
 
+/** Estimation mensuelle Banque mondiale (Real-Time Food Prices) : jamais une observation réelle. */
+export interface Estimate {
+  id: string // wb|marché|produit|AAAA-MM
+  source: 'wb-rtfp'
+  market: string
+  admin1: string
+  admin2: string
+  lat: number | null
+  lon: number | null
+  item: string // nom de la colonne sans préfixe, ex. "rice"
+  date: string // AAAA-MM-01
+  price: number // estimation de clôture (c_)
+  low: number | null // l_
+  high: number | null // h_
+  trust: number | null // trust_ (indice de confiance publié)
+  currency: string
+  importedAt: string
+  file: string
+}
+
+/** Prix officiel ou réglementé (OMH, ODR, prix plancher…), saisi avec sa source et sa date d'effet. */
+export interface OfficialPrice {
+  id?: number
+  key: string // clé du produit (voir lib/official.ts)
+  label: string
+  unit: string
+  price: number
+  area: string // '' = national, sinon district / région
+  effectiveFrom: string // AAAA-MM ou AAAA-MM-JJ
+  sourceType: 'official' | 'press'
+  sourceName: string
+  sourceUrl: string
+  enteredAt: string
+  enteredBy: string
+}
+
+/** Taux de change : ariary pour 1 unité de devise. */
+export interface FxRate {
+  id: string // base|date|provider
+  base: string // EUR, USD…
+  rate: number // MGA pour 1 base
+  date: string
+  provider: string // BFM ou "blended"
+  fetchedAt: string
+}
+
 export interface KV {
   key: string
   value: unknown
@@ -170,6 +216,9 @@ export const db = new Dexie('madaprice') as Dexie & {
   kv: EntityTable<KV, 'key'>
   history: EntityTable<HistoryEntry, 'id'>
   shopEdits: EntityTable<ShopEdit, 'shopId'>
+  estimates: EntityTable<Estimate, 'id'>
+  officialPrices: EntityTable<OfficialPrice, 'id'>
+  fxRates: EntityTable<FxRate, 'id'>
 }
 
 db.version(1).stores({
@@ -189,6 +238,13 @@ db.version(1).stores({
 db.version(2).stores({
   history: '++id, at, kind, key',
   shopEdits: 'shopId',
+})
+
+// Sources complémentaires : tables séparées, n'altèrent pas les relevés WFP existants.
+db.version(3).stores({
+  estimates: 'id, item, market, date, [item+market]',
+  officialPrices: '++id, key, effectiveFrom',
+  fxRates: 'id, base, date',
 })
 
 /** Ajoute une consultation à l'historique (une seule entrée par élément, la plus récente). */
