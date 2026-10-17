@@ -136,7 +136,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
       {!online && (
         <div className="banner warn"><Icon name="wifiOff" /> <div>{t('offline')}{lastSuccess ? ` · ${t('cachedFrom')} ${fmtDateTime(lastSuccess, lang)}` : ''}</div></div>
       )}
-      {!s.appId && (
+      {!s.appId && s.dataSource === 'hapi' && (
         <div className="banner warn">
           <Icon name="settings" />
           <div style={{ flex: 1 }}>{t('noAppId')}</div>
@@ -166,7 +166,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
             {newestPeriod && <div className="muted" style={{ fontSize: 12 }}>{t('lastObs')} : {fmtPeriod(newestPeriod, newestPeriod, lang)} · WFP / HDX HAPI</div>}
           </div>
         </div>
-        <button className="btn small secondary" onClick={() => syncWfp('manual')} disabled={st.running || !online || !s.appId} aria-label={t('syncNow')}>
+        <button className="btn small secondary" onClick={() => syncWfp('manual')} disabled={st.running || !online || (!s.appId && s.dataSource === 'hapi')} aria-label={t('syncNow')}>
           {st.running ? <span className="spinner" /> : <Icon name="refresh" size={16} />}
         </button>
       </div>

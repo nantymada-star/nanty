@@ -10,6 +10,7 @@ import { externalDirectionsUrl, isOpenNow, osmUrl } from '../lib/geo'
 import { fmtAr, fmtDateTime, fmtNum } from '../lib/format'
 import { haversineKm } from '../lib/stats'
 import { shopKindLabel } from './MapPage'
+import { ShopServerPanel } from '../components/Shared'
 
 export default function ShopPage() {
   const { type = '', id = '' } = useParams()
@@ -73,6 +74,8 @@ export default function ShopPage() {
           </div>
         )}
       </div>
+
+      <ShopServerPanel shop={shop} />
 
       <div className="card">
         <div className="row between"><h2>{t('declaredPrices')}</h2><Link className="btn small secondary" to={`/mpivarotra?shop=${encodeURIComponent(shop.id)}`}><Icon name="plus" size={16} /> {t('addPrice')}</Link></div>

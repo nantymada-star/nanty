@@ -44,6 +44,62 @@ await page.route('https://api.frankfurter.dev/**', (r) => {
     : [1, 2, 3, 4].map((i) => ({ date: `2026-0${5 + i}-01`, base: u.searchParams.get('base'), quote: 'MGA', rate: 4300 + i * 20 }))
   r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) })
 })
+
+// ---- Base partagée Supabase simulée (REST + Auth) — uniquement pour ce test ----
+const SB = 'https://aetwjbobrnrudmulvnjp.supabase.co'
+const serverRows = rows.map((r) => {
+  const ps = r.reference_period_start.slice(0, 10)
+  return { id: ['wfp', r.market_code, r.commodity_code, r.unit, r.price_type, r.price_flag, ps].join('|'), source: 'wfp-hapi',
+    market_code: r.market_code, market_name: r.market_name, admin1: r.admin1_name, admin2: r.admin2_name, lat: r.lat, lon: r.lon,
+    commodity_code: r.commodity_code, commodity_name: r.commodity_name, category: r.commodity_category, unit: r.unit === 'KG' ? 'kg' : r.unit,
+    price_type: r.price_type, price_flag: r.price_flag, currency: 'MGA', price: r.price, period_start: ps, period_end: r.reference_period_end.slice(0, 10),
+    first_seen_at: '2026-10-17T03:10:00Z', last_verified_at: '2026-10-17T03:10:00Z', revisions: [], suspect: null }
+}).sort((a, b) => a.id.localeCompare(b.id))
+const USER = { id: '11111111-1111-4111-8111-111111111111', email: 'nantymada@gmail.com', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-10-17T00:00:00Z' }
+const sbState = { submissions: [], quotes: [], business: null, prices: [], inserted: [] }
+const pending = [{ id: 'aaaaaaaa-0000-4000-8000-000000000001', submitted_by: 'u2', commodity_code: '52', commodity_name: 'Rice (local)', category: '', market_code: '1001', market_name: 'Antananarivo', admin1: 'Analamanga', unit: 'kg', price_type: 'Retail', price: 2600, observed_on: '2026-10-16', note: 'Tsena Analakely', status: 'pending', moderated_at: null, moderation_note: null, created_at: '2026-10-17T05:00:00Z' }]
+await page.route(SB + '/**', async (r) => {
+  const req = r.request()
+  const u = new URL(req.url())
+  const path = u.pathname
+  const method = req.method()
+  const ok = (body, status = 200) => r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) })
+  if (method === 'OPTIONS') return ok({})
+  if (path.startsWith('/auth/v1/token')) return ok({ access_token: 'test.jwt.token', token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'r', user: USER })
+  if (path.startsWith('/auth/v1/user')) return ok(USER)
+  if (path.startsWith('/auth/v1/logout')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
+  if (path.startsWith('/realtime')) return r.abort()
+  const table = path.replace('/rest/v1/', '')
+  const body = req.postData() ? JSON.parse(req.postData()) : null
+  if (table === 'price_observations') return ok(u.searchParams.get('or') ? [] : serverRows)
+  if (table === 'markets') return ok([...new Map(serverRows.map((x) => [x.market_code, { code: x.market_code, name: x.market_name, admin1: x.admin1, admin2: x.admin2, lat: x.lat, lon: x.lon }])).values()])
+  if (table === 'data_sync_runs') return ok([{ id: 1, status: 'success', trigger: 'cron', started_at: '2026-10-17T03:10:00Z', finished_at: '2026-10-17T03:11:00Z', duration_ms: 60000, fetched: serverRows.length, inserted: serverRows.length, updated: 0, error: null }])
+  if (table === 'profiles') return ok(u.searchParams.get('id') ? { id: USER.id, email: USER.email, display_name: 'Nanty', role: 'admin', reputation: 0, created_at: '2026-10-17' } : [{ id: USER.id, email: USER.email, display_name: 'Nanty', role: 'admin', reputation: 0, created_at: '2026-10-17' }, { id: 'u2', email: 'rija@example.mg', display_name: 'Rija', role: 'user', reputation: 3, created_at: '2026-10-17' }])
+  if (table === 'user_submissions') {
+    if (method === 'POST') { sbState.inserted.push(body); return ok([{ ...body, id: 'new' }], 201) }
+    if (method === 'PATCH') { const id = (u.searchParams.get('id') || '').replace('eq.', ''); const i = pending.findIndex((x) => x.id === id); if (i >= 0) { pending[i].status = body.status; sbState.submissions.push({ id, ...body }); pending.splice(i, 1) } return ok([]) }
+    const st = u.searchParams.get('status')
+    if (st === 'eq.pending') return ok(pending)
+    if (u.searchParams.get('submitted_by')) return ok(sbState.inserted.map((x, i) => ({ id: 'mine' + i, status: 'pending', created_at: '2026-10-17T06:00:00Z', moderation_note: null, ...x })))
+    return ok([])
+  }
+  if (table === 'businesses') {
+    if (method === 'POST') { sbState.business = { id: 'bbbbbbbb-0000-4000-8000-000000000001', verified: false, owner_id: USER.id, updated_at: '2026-10-17T06:00:00Z', address: null, phone: null, hours: null, delivery: null, delivery_area: null, ...body }; return ok([sbState.business], 201) }
+    if (method === 'PATCH') { Object.assign(sbState.business, body); return ok([]) }
+    if (u.searchParams.get('osm_id')) return ok(sbState.business && u.searchParams.get('osm_id') === 'eq.' + sbState.business.osm_id ? sbState.business : null)
+    return ok(sbState.business ? [sbState.business] : [])
+  }
+  if (table === 'business_prices') {
+    if (method === 'POST') { sbState.prices.push({ id: 'p' + sbState.prices.length, updated_at: '2026-10-17T06:00:00Z', ...body }); return ok([], 201) }
+    return ok(sbState.prices)
+  }
+  if (table === 'quote_requests') {
+    if (method === 'POST') { sbState.quotes.push({ id: 'q' + sbState.quotes.length, status: 'open', created_at: '2026-10-17T06:00:00Z', reply: null, replied_at: null, requester_id: USER.id, businesses: { name: 'Test Supermarket' }, ...body }); return ok([], 201) }
+    return ok(sbState.quotes)
+  }
+  if (path.startsWith('/rest/v1/rpc/')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
+  return ok([])
+})
 await page.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }))
 
 const shot = async (n) => { await page.waitForTimeout(500); await page.screenshot({ path: `${OUT}/${n}.png`, fullPage: true }) }
@@ -194,6 +250,49 @@ checks.compareEnrich = await has('Tombana Banky Iraisam-pirenena ho an')
 await shot('35-compare-enrich')
 await page.goto(B + '/')
 checks.homeFx = await has('1 USD')
+// ---- Série 2 : compte, partage, modération, devis ----
+await page.goto(B + '/kaonty')
+await page.getByLabel('Mailaka').fill('nantymada@gmail.com')
+await page.getByLabel('Teny miafina').fill('motdepasse-test')
+await page.locator('form button.btn.orange').click()
+checks.login = await has('nantymada@gmail.com')
+await shot('36-account')
+await page.goto(B + '/admin')
+checks.serverModeration = await has('Tsena Analakely')
+await page.getByRole('button', { name: 'Ekena' }).first().click()
+await page.waitForTimeout(400)
+checks.approved = sbState.submissions.some((x) => x.status === 'approved')
+checks.usersAdmin = await has('rija@example.mg')
+await shot('37-admin-server')
+await page.goto(B + '/hanome-vidiny')
+await page.locator('select').nth(3).selectOption({ index: 1 })
+await page.locator('input[type=number]').first().fill('2550')
+await page.getByRole('button', { name: /Alefaso/ }).click()
+await page.waitForTimeout(500)
+checks.sharedSubmit = sbState.inserted.length === 1 && sbState.inserted[0].price === 2550
+await shot('38-submit-shared')
+await page.goto(B + '/mpivarotra?shop=node/1')
+await page.getByRole('button', { name: /Ity no fivarotako/ }).click()
+await page.waitForTimeout(500)
+checks.claim = !!sbState.business && sbState.business.osm_id === 'node/1'
+await page.locator('input[placeholder="Vary gasy 50 kg"]').last().fill('Ciment 50 kg')
+await page.locator('form input[type=number]').last().fill('38000')
+await page.locator('form button.btn.orange').last().click()
+await page.waitForTimeout(400)
+checks.serverPrice = sbState.prices.length === 1
+await shot('39-merchant-server')
+await page.goto(B + '/fivarotana/node/1')
+await page.getByText('Hangataka tombam-bidy').click()
+await page.locator('details input').first().fill('Ciment')
+await page.getByRole('button', { name: /Alefaso ny fangatahana/ }).click()
+await page.waitForTimeout(400)
+checks.quote = sbState.quotes.length === 1
+await shot('40-shop-quote')
+await page.goto(B + '/devis')
+checks.myQuotes = await has('Ciment')
+await page.goto(B + '/lisitra')
+checks.lists = await page.locator('input[placeholder="Lisitra vaovao"]').waitFor({ timeout: 5000 }).then(() => true, () => false)
+await shot('41-lists')
 console.log('CHECKS ' + JSON.stringify(checks))
 
 await page.goto(B + '/mombamomba')

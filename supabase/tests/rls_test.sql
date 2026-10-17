@@ -1,0 +1,17 @@
+-- Tests des règles d'accès (exécutés le 17/10/2026 : 20/20 « ok »).
+-- Prérequis : deux comptes de test (voir cleanup_rls_test_data.sql pour les retirer).
+--   u1  = 00000000-0000-4000-8000-000000000001 (utilisateur)
+--   adm = 00000000-0000-4000-8000-000000000002 (admin)
+-- Chaque cas s'exécute sous le rôle authenticated ou anon, avec l'identité simulée par request.jwt.claims.
+-- Résultat : select current_setting('test.results');
+-- Cas vérifiés :
+--  1 auto-promotion refusée            2 réputation non modifiable par soi
+--  3 profil d'autrui invisible          4 envoi de prix forcé « en attente »
+--  5 auto-validation refusée            6 date future refusée
+--  7 écriture des relevés WFP refusée   8 commerce : propriétaire forcé, non vérifié
+--  9 le propriétaire ajoute un prix    10 prix officiel refusé à un utilisateur
+-- 11 demande de devis                  12 journal d'audit invisible
+-- 13 modération admin + réputation +1  14 vérification d'un commerce par l'admin
+-- 15 prix officiel saisi par l'admin   16 audit visible par l'admin
+-- 17 anonyme : prix validé visible     18 anonyme : devis invisibles
+-- 19 anonyme : aucune écriture         20 compteur de vues public

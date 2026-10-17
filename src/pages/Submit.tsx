@@ -5,6 +5,9 @@ import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { PageHeader, StatusBadge } from '../components/ui'
 import { db, type Observation } from '../lib/db'
+import { useAuth } from '../lib/auth'
+import { errText, supabase, type ServerSubmission } from '../lib/supabase'
+import { useServer } from '../lib/useServer'
 import { useData } from '../lib/data'
 import { useSettings } from '../lib/settings'
 import { commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -16,6 +19,11 @@ export default function Submit() {
   const { t, lang } = useT()
   const s = useSettings()
   const { commodities, markets, seriesList } = useData()
+  const { session } = useAuth()
+  const { data: serverMine, reload: reloadServer } = useServer<ServerSubmission[]>(
+    () => (session && supabase ? supabase.from('user_submissions').select('*').eq('submitted_by', session.user.id).order('created_at', { ascending: false }).limit(50) : null),
+    [session?.user.id], ['user_submissions'],
+  )
   const mine = useLiveQuery(() => db.observations.where('source').equals('user').reverse().sortBy('firstSeenAt'), []) ?? []
   const [c, setC] = useState(commodities[0]?.code ?? '')
   const com = commodities.find((x) => x.code === c) ?? commodities[0]
@@ -43,6 +51,16 @@ export default function Submit() {
     if (med && (value > med * 3 || value < med / 3) && !confirmFar) {
       setConfirmFar(true)
       setMsg({ kind: 'warn', text: t('farFromMedian', { m: fmtAr(med) }) }); return
+    }
+    // Connecté : envoi à la base partagée (modération par le staff, visible par tous une fois validé)
+    if (session && supabase) {
+      const { error } = await supabase.from('user_submissions').insert({
+        commodity_code: com.code, commodity_name: com.name, category: com.category, market_code: market.code, market_name: market.name,
+        admin1: market.admin1, unit: u, price_type: pt, price: value, observed_on: date, note: note.trim() || null, lat: market.lat, lon: market.lon,
+      })
+      if (error) { setMsg({ kind: 'err', text: errText(error) }); return }
+      setMsg({ kind: 'ok', text: t('sent') }); setPrice(''); setNote(''); setConfirmFar(false); reloadServer()
+      return
     }
     const now = new Date().toISOString()
     const o: Observation = {
@@ -84,6 +102,28 @@ export default function Submit() {
         <button className="btn orange block" onClick={submit}><Icon name="check" size={18} /> {confirmFar ? t('yes') + ' — ' + t('send') : t('send')}</button>
         <small>{lang === 'mg' ? 'Tsy mbola misy mpizara iraisana: ato amin\'ity fitaovana ity no voatahiry ny vidinao ary hamarinin\'ny mpitantana eto.' : 'Pas encore de serveur partagé : votre prix est stocké sur cet appareil et validé par l’administration locale.'} <Link to="/admin">{t('moderation')}</Link></small>
       </div>
+      {!session && <div className="banner info"><Icon name="user" /> <div style={{ flex: 1 }}>{t('needLogin')}</div><Link className="btn small" to="/kaonty">{t('login')}</Link></div>}
+      {!!serverMine?.length && (
+        <div className="card">
+          <h2>{lang === 'mg' ? 'Ny vidiny nalefako' : 'Mes prix envoyés'} <span className="badge b-estimated">{t('sharedBadge')}</span></h2>
+          <ul className="list">
+            {serverMine.map((o) => (
+              <li key={o.id} className="row between">
+                <div>
+                  <b>{commodityLabel(o.commodity_name, lang)}</b> · {o.market_name}
+                  <div className="row" style={{ gap: 6 }}>
+                    <StatusBadge status={o.status === 'pending' ? 'pending' : o.status === 'approved' ? 'verified' : 'stale'} />
+                    {o.status === 'rejected' && <span className="badge b-suspect">{t('reject')}</span>}
+                    <small>{fmtDateTime(o.created_at, lang)}</small>
+                  </div>
+                  {o.moderation_note && <small>{o.moderation_note}</small>}
+                </div>
+                <div className="price num">{fmtAr(Number(o.price))}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {mine.length > 0 && (
         <div className="card">
           <h2>{lang === 'mg' ? 'Ny vidiny nalefako' : 'Mes prix envoyés'}</h2>

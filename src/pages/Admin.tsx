@@ -3,6 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { median } from '../lib/stats'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
+import { ServerAdmin } from '../components/Shared'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { KPI, PageHeader, SyncStatus } from '../components/ui'
@@ -80,6 +81,12 @@ export default function Admin() {
     <div className="stack">
       <PageHeader title={t('adminTitle')} />
       {s.role !== 'admin' && <div className="banner warn"><Icon name="shield" /> <div>{t('role')} : {t('roleUser')}. <button className="btn small" onClick={() => updateSettings({ role: 'admin' })}>{t('roleAdmin')}</button></div></div>}
+      <ServerAdmin />
+      <label className="field"><span>{t('dataSource')}</span>
+        <select value={s.dataSource} onChange={(e) => updateSettings({ dataSource: e.target.value as typeof s.dataSource })}>
+          <option value="server">{t('srcServer')}</option><option value="hapi">{t('srcHapi')}</option>
+        </select>
+      </label>
       <small>{t('adminLocalNote')}</small>
       <Link className="btn secondary" to="/fanampiny?tab=official"><Icon name="globe" size={18} /> {t('enrichTitle')} : {t('tabFx')} · {t('tabOfficial')} · {t('tabWb')}</Link>
 

@@ -8,7 +8,10 @@ import { Empty, PageHeader, StatusBadge, useOnline } from '../components/ui'
 import { db, getKV } from '../lib/db'
 import { useSettings } from '../lib/settings'
 import { FX_CURRENCIES, latestRates, syncFx, syncFxHistory } from '../lib/fx'
-import { currentOfficial, ensureOfficialSeeds, OFFICIAL_PRESETS, officialIsStale, presetOf } from '../lib/official'
+import { currentOfficial, ensureOfficialSeeds, OFFICIAL_PRESETS, OFFICIAL_SEEDS, officialIsStale, presetOf } from '../lib/official'
+import { useAuth } from '../lib/auth'
+import { errText, supabase } from '../lib/supabase'
+import { useServer } from '../lib/useServer'
 import { importRtfp, itemLabel, latestByMarket } from '../lib/rtfp'
 import { commodityLabel } from '../lib/commodities'
 import { fmtAr, fmtDateTime, fmtDay, fmtMonth, fmtNum, MONTHS_SHORT } from '../lib/format'
@@ -119,7 +122,14 @@ function FxTab() {
 function OfficialTab() {
   const { t, lang } = useT()
   const s = useSettings()
-  const all = useLiveQuery(() => db.officialPrices.toArray(), []) ?? []
+  const local = useLiveQuery(() => db.officialPrices.toArray(), []) ?? []
+  const { session, isStaff } = useAuth()
+  // Prix officiels partagés (saisis par le staff) ; repli sur les valeurs locales si la base est vide
+  const { data: shared, reload: reloadShared } = useServer<{ id: number; key: string; label: string; unit: string; price: number; area: string; effective_from: string; source_type: 'official' | 'press'; source_name: string; source_url: string; entered_at: string }[]>(
+    () => (supabase ? supabase.from('official_prices').select('*') : null), [], ['official_prices'])
+  const all = shared?.length
+    ? shared.map((p) => ({ id: p.id, key: p.key, label: p.label, unit: p.unit, price: Number(p.price), area: p.area, effectiveFrom: p.effective_from, sourceType: p.source_type, sourceName: p.source_name, sourceUrl: p.source_url, enteredAt: p.entered_at, enteredBy: '' }))
+    : local
   const cur = currentOfficial(all).sort((a, b) => a.key.localeCompare(b.key) || a.area.localeCompare(b.area))
   const [f, setF] = useState({ key: OFFICIAL_PRESETS[0].key, price: '', area: '', effectiveFrom: new Date().toISOString().slice(0, 10), sourceType: 'official' as 'official' | 'press', sourceName: '', sourceUrl: '' })
   const [msg, setMsg] = useState('')
@@ -130,6 +140,19 @@ function OfficialTab() {
     const price = Number(f.price)
     if (!p || !(price > 0) || !f.effectiveFrom || !f.sourceName.trim()) { setMsg(t('invalid')); return }
     if (f.sourceUrl && !/^https:\/\//.test(f.sourceUrl)) { setMsg(t('invalid')); return }
+    if (session && isStaff && supabase) {
+      const { error } = await supabase.from('official_prices').insert({
+        key: p.key, label: p.fr, unit: p.unit, price, area: f.area.trim(), effective_from: f.effectiveFrom,
+        source_type: f.sourceType, source_name: f.sourceName.trim(), source_url: f.sourceUrl.trim(),
+      })
+      if (error) { setMsg(errText(error)); return }
+      // Première saisie partagée : publie aussi les valeurs initiales sourcées pour garder l'historique
+      if (!shared?.length) {
+        await supabase.from('official_prices').insert(OFFICIAL_SEEDS.map((x) => ({ key: x.key, label: x.label, unit: x.unit, price: x.price, area: x.area, effective_from: x.effectiveFrom, source_type: x.sourceType, source_name: x.sourceName, source_url: x.sourceUrl })))
+      }
+      setMsg(t('saved')); setF({ ...f, price: '' }); reloadShared()
+      return
+    }
     await db.officialPrices.add({
       key: p.key, label: p.fr, unit: p.unit, price, area: f.area.trim(), effectiveFrom: f.effectiveFrom,
       sourceType: f.sourceType, sourceName: f.sourceName.trim(), sourceUrl: f.sourceUrl.trim(),

@@ -15,6 +15,8 @@ export interface Settings {
   onboarded: boolean
   appId: string
   hapiMode: 'auto' | 'direct' | 'proxy'
+  /** server = base partagée MadaPrice (synchronisée chaque jour par le serveur) ; hapi = appel direct depuis l'appareil */
+  dataSource: 'server' | 'hapi'
   /** Intervalle de vérification automatique pendant que l'app est ouverte (min). */
   autoSyncMinutes: number
   /** Profondeur d'historique lors de la première synchronisation (années). */
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   appId: (import.meta.env?.VITE_HAPI_APP_IDENTIFIER as string | undefined) ?? '',
   hapiMode: 'auto',
+  dataSource: 'server',
   autoSyncMinutes: 30,
   historyYears: 4,
   staleDays: DEFAULT_STALE_DAYS,

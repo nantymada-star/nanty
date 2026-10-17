@@ -7,6 +7,8 @@ import { DataProvider, useData } from './lib/data'
 import { evaluateSeasonAlerts } from './lib/seasonal'
 import { ensureOfficialSeeds } from './lib/official'
 import { syncFxIfDue } from './lib/fx'
+import { AuthProvider } from './lib/auth'
+import { subscribeServerPrices } from './lib/serverSync'
 import { db } from './lib/db'
 import { useSettings } from './lib/settings'
 import { syncIfDue, syncWfp } from './lib/sync'
@@ -30,6 +32,9 @@ const Admin = lazy(() => import('./pages/Admin'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const History = lazy(() => import('./pages/History'))
 const Enrich = lazy(() => import('./pages/Enrich'))
+const Account = lazy(() => import('./pages/Account'))
+const Lists = lazy(() => import('./pages/Lists'))
+const Quotes = lazy(() => import('./pages/Quotes'))
 
 /** Planification : au démarrage, toutes les N minutes, au retour du réseau et au retour sur l'onglet. */
 function useAutoSync() {
@@ -84,6 +89,9 @@ function Shell() {
   const { t } = useT()
   useSeasonAlerts()
   useEnrichment()
+  // Temps réel : nouveaux relevés poussés par la base partagée
+  const { dataSource, onboarded } = useSettings()
+  useEffect(() => (onboarded && dataSource !== 'hapi' ? subscribeServerPrices() : undefined), [dataSource, onboarded])
   const unread = useLiveQuery(() => db.notifications.filter((n) => !n.read).count(), []) ?? 0
   const nav: [string, string, Parameters<typeof t>[0]][] = [
     ['/', 'home', 'navHome'],
@@ -103,6 +111,7 @@ function Shell() {
         </Link>
         <span className="spacer" />
         <Link className="icon" to="/hitady" aria-label={t('navSearch')}><Icon name="search" /></Link>
+        <Link className="icon" to="/kaonty" aria-label={t('account')}><Icon name="user" /></Link>
         <Link className="icon" to="/fanairana" aria-label={t('notifications')}>
           <Icon name="bell" />
           {unread > 0 && <span className="badge-dot">{unread > 9 ? '9+' : unread}</span>}
@@ -137,6 +146,9 @@ function Shell() {
             <Route path="/fiarovana" element={<Privacy />} />
             <Route path="/tantarako" element={<History />} />
             <Route path="/fanampiny" element={<Enrich />} />
+            <Route path="/kaonty" element={<Account />} />
+            <Route path="/lisitra" element={<Lists />} />
+            <Route path="/devis" element={<Quotes />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>
@@ -151,7 +163,9 @@ export default function App() {
   useAutoSync()
   return (
     <BrowserRouter>
-      <DataProvider>{s.onboarded ? <Shell /> : <Onboarding />}</DataProvider>
+      <AuthProvider>
+        <DataProvider>{s.onboarded ? <Shell /> : <Onboarding />}</DataProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

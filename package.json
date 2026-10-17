@@ -12,6 +12,7 @@
     "e2e": "npm run build && node e2e/smoke.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^1.1.7",
     "leaflet": "1.9",

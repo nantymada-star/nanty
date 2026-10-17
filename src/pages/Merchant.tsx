@@ -11,12 +11,15 @@ import { fetchShops } from '../lib/geo'
 import { stripAccents } from '../lib/commodities'
 import { fmtAgo, fmtAr, fmtDateTime, fmtNum } from '../lib/format'
 import { shopKindLabel } from './MapPage'
+import { MerchantServer } from '../components/Shared'
+import { useAuth } from '../lib/auth'
 
 const ALL_KINDS = ['shop=supermarket', 'shop=convenience', 'shop=general', 'shop=grocery', 'shop=wholesale', 'shop=hardware', 'shop=doityourself', 'shop=agrarian', 'shop=butcher', 'shop=bakery', 'amenity=marketplace']
 
 export default function Merchant() {
   const { t, lang } = useT()
   const s = useSettings()
+  const { session } = useAuth()
   const online = useOnline()
   const [params, setParams] = useSearchParams()
   const shopId = params.get('shop') ?? ''
@@ -72,7 +75,7 @@ export default function Merchant() {
   return (
     <div className="stack">
       <PageHeader title={t('merchantTitle')} />
-      <div className="banner info"><Icon name="store" /> <div>{t('merchantNote')}</div></div>
+      {!session && <div className="banner info"><Icon name="store" /> <div>{t('merchantNote')}</div></div>}
 
       {!shop ? (
         <div className="card stack">
@@ -100,6 +103,8 @@ export default function Merchant() {
               <button className="btn small ghost" onClick={() => setParams({})}>{t('changeTown')}</button>
             </div>
           </div>
+          <MerchantServer shop={shop} />
+          {!session && <>
           <div className="chips" role="tablist">
             {([['info', 'tabInfo'], ['products', 'tabProducts'], ['stats', 'tabStats']] as const).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{t(l)}</button>
@@ -179,6 +184,7 @@ export default function Merchant() {
               </ul>
             )}
           </div>
+          </>}
           </>}
         </>
       )}

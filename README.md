@@ -100,15 +100,33 @@ src/
   pages/               les écrans
 ```
 
-## Limites actuelles (choix « sans serveur »)
+## Base partagée (série 2 — Supabase)
 
-Sans backend partagé (le projet Supabase n'a pas pu être créé), ces fonctions restent **locales à l'appareil** :
-- profil, rôles (utilisateur / commerçant / admin) : pas d'authentification en ligne ;
-- prix soumis par les utilisateurs et prix des commerçants : stockés sur l'appareil et modérés localement, donc non partagés avec les autres utilisateurs ;
-- notifications : seulement dans l'app et via les notifications du navigateur, pas d'e-mail ni de SMS ;
-- pas de synchronisation quand l'app est fermée.
+Projet Supabase : `aetwjbobrnrudmulvnjp` (URL et clé publique dans `src/lib/supabase.ts`, remplaçables par `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`). La clé publique est faite pour le navigateur : l'accès est contrôlé par les règles RLS.
 
-Pour rendre ces fonctions multi-utilisateurs, il faudra ajouter une base partagée (par exemple Supabase/PostgreSQL : tables `user_submissions`, `businesses`, `business_prices`, `audit_logs`, authentification avec rôles, tâche planifiée quotidienne côté serveur qui appelle la même logique que `lib/sync.ts`).
+| Élément | Où |
+|---|---|
+| Schéma, rôles, règles d'accès, audit | `supabase/migrations/` |
+| Tests des règles d'accès (20 cas) | `supabase/tests/rls_test.sql` |
+| Synchronisation WFP serveur | `supabase/functions/sync-wfp` (fonction serveur) + tâche planifiée `sync-wfp-daily` (03:10 UTC = 06:10 Madagascar) |
+
+- **Comptes** : e-mail + mot de passe (`/kaonty`), mot de passe oublié, nouveau mot de passe. Le compte `nantymada@gmail.com` devient administrateur à l'inscription ; les rôles se changent ensuite dans Admin → « Utilisateurs et rôles ».
+- **Prix WFP** : l'app lit la base partagée (aucun identifiant HDX ni relais sur l'appareil), de façon incrémentale, et reçoit les nouveaux relevés en direct. L'ancien mode direct HDX reste disponible (Admin → Source des prix WFP).
+- **Prix envoyés** : partagés, modérés par un modérateur/admin, réputation +1/−1, limite de 10 envois par heure, visibles par tous une fois validés.
+- **Commerces** : revendication d'une fiche OpenStreetMap, fiche, prix et stock partagés, badge « Vérifié » donné par un admin, demandes de devis et réponses, vues des 30 derniers jours.
+- **Prix officiels partagés**, **listes de courses** sur le compte (`/lisitra`), **mes demandes de devis** (`/devis`).
+
+### À configurer dans le tableau de bord Supabase
+1. **Edge Functions → Secrets** : ajouter `HAPI_APP_IDENTIFIER` (identifiant HDX). Sans lui, la synchronisation serveur s'arrête avec le message « Secret HAPI_APP_IDENTIFIER manquant ».
+2. **Authentication → URL Configuration** : mettre l'adresse du site Cloudflare dans *Site URL* et ajouter `https://<votre-site>/kaonty` dans *Redirect URLs* (liens de confirmation et de mot de passe oublié).
+3. Facultatif : un serveur d'e-mails (SMTP) pour dépasser la limite d'envoi intégrée, et la protection contre les mots de passe compromis (Authentication → Policies).
+
+## Limites actuelles
+
+Sans compte, l'app fonctionne comme avant (données sur l'appareil). Restent à faire :
+- notifications push quand l'app est fermée, e-mail et SMS ;
+- connexion par SMS (fournisseur SMS à configurer) ;
+- historique, simulations, alertes et favoris restent sur l'appareil (non liés au compte).
 
 Autres limites :
 - la couverture dépend des marchés suivis par le WFP ; les matériaux de construction et la plupart des produits de commerce n'ont pas de prix publics, d'où la recherche de commerces OSM et les prix déclarés ;

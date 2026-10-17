@@ -5,6 +5,7 @@ import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { PageHeader, PlacePicker, SyncStatus } from '../components/ui'
 import { db } from '../lib/db'
+import { useAuth } from '../lib/auth'
 import { useData } from '../lib/data'
 import { updateSettings, useSettings } from '../lib/settings'
 import { commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -13,6 +14,7 @@ import { fmtAr, fmtNum } from '../lib/format'
 export default function Profile() {
   const { t, lang } = useT()
   const s = useSettings()
+  const { session } = useAuth()
   const { seriesList, commodities, marketByCode } = useData()
   const favs = useLiveQuery(() => db.favorites.toArray(), []) ?? []
   const [usage, setUsage] = useState<number | null>(null)
@@ -50,7 +52,7 @@ export default function Profile() {
         <label className="field"><span>{t('yourName')}</span><input value={s.displayName} maxLength={60} onChange={(e) => updateSettings({ displayName: e.target.value })} /></label>
         <small>{t('localOnly')}</small>
         <label className="field"><span>{t('role')}</span>
-          <select value={s.role} onChange={(e) => updateSettings({ role: e.target.value as typeof s.role })}>
+          <select value={s.role} disabled={!!session} title={session ? t('loggedAs') : undefined} onChange={(e) => updateSettings({ role: e.target.value as typeof s.role })}>
             <option value="user">{t('roleUser')}</option><option value="merchant">{t('roleMerchant')}</option><option value="admin">{t('roleAdmin')}</option>
           </select>
         </label>
@@ -104,6 +106,9 @@ export default function Profile() {
 
       <div className="card">
         <ul className="list">
+          <li><Link className="rowlink" to="/kaonty"><Icon name="user" /> <span style={{ flex: 1 }}>{t('account')}</span><Icon name="chevron" /></Link></li>
+          <li><Link className="rowlink" to="/lisitra"><Icon name="edit" /> <span style={{ flex: 1 }}>{t('lists')}</span><Icon name="chevron" /></Link></li>
+          <li><Link className="rowlink" to="/devis"><Icon name="store" /> <span style={{ flex: 1 }}>{t('myQuotes')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/tantarako"><Icon name="refresh" /> <span style={{ flex: 1 }}>{t('historyTitle')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/kajy"><Icon name="calc" /> <span style={{ flex: 1 }}>{t('mySims')}</span><Icon name="chevron" /></Link></li>
           <li><Link className="rowlink" to="/fanairana"><Icon name="bell" /> <span style={{ flex: 1 }}>{t('myAlerts')}</span><Icon name="chevron" /></Link></li>

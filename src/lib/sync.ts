@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react'
 import { db, getKV, setKV, type Observation, type SyncRun } from './db'
 import { fetchAllFoodPrices, flagOutliers, HapiError, normalizeRows } from './hapi'
 import { getSettings } from './settings'
+import { supabase } from './supabase'
+import { syncFromServer } from './serverSync'
 import { buildSeries, seriesKey, shiftMonths } from './stats'
 import { commodityLabel } from './commodities'
 import { fmtAr, fmtPeriod } from './format'
@@ -161,6 +163,19 @@ async function withLock<T>(fn: () => Promise<T>): Promise<T | null> {
 export async function syncWfp(trigger: string): Promise<SyncRun | null> {
   if (live.running) return null
   const s = getSettings()
+  // Source par défaut : la base partagée (aucun identifiant HDX ni relais nécessaire sur l'appareil)
+  if (s.dataSource !== 'hapi' && supabase) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { setLive({ lastError: 'offline' }); return null }
+    setLive({ running: true, progress: 0, lastError: null })
+    try {
+      const r = await syncFromServer(trigger, (n) => setLive({ progress: n }))
+      setLive({ running: false, lastError: r?.status === 'error' ? r.error ?? 'error' : null })
+      return r
+    } catch (e) {
+      setLive({ running: false, lastError: (e as Error).message })
+      return null
+    }
+  }
   if (!s.appId) {
     setLive({ lastError: 'no-app-id' })
     return null
