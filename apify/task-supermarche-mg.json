@@ -1,0 +1,15 @@
+{
+  "startUrls": [{ "url": "https://supermarche.mg/boutique/" }],
+  "linkSelector": "a[href]",
+  "globs": [
+    { "glob": "https://supermarche.mg/categorie-produit/**" },
+    { "glob": "https://supermarche.mg/boutique/page/*" }
+  ],
+  "excludes": [{ "glob": "https://supermarche.mg/*add-to-cart=*" }],
+  "pageFunction": "// coller ici le contenu de apify/pageFunction.js",
+  "injectJQuery": true,
+  "ignoreSslErrors": true,
+  "maxRequestsPerCrawl": 3000,
+  "maxConcurrency": 2,
+  "proxyConfiguration": { "useApifyProxy": true }
+}
