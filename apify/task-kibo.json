@@ -3,24 +3,21 @@
   "respectRobotsTxtFile": true,
   "startUrls": [
     {
-      "url": "https://www.kibo.mg/"
+      "url": "https://www.kibo.mg/tananarive/"
     }
   ],
   "linkSelector": "a[href]",
   "globs": [
     {
-      "glob": "https://www.kibo.mg/*[0-9]-*"
-    },
-    {
-      "glob": "https://www.kibo.mg/*?page=*"
+      "glob": "https://www.kibo.mg/tananarive/[0-9]*"
     }
   ],
   "excludes": [
     {
-      "glob": "https://www.kibo.mg/*{order,tag,id_currency,search_query,back,controller}=*"
+      "glob": "https://www.kibo.mg/tananarive/*{order,tag,search_query,back,controller,q}=*"
     },
     {
-      "glob": "https://www.kibo.mg/*.{jpg,png,css,js}"
+      "glob": "https://www.kibo.mg/tananarive/*.{jpg,png,css,js}"
     }
   ],
   "pageFunction": "// coller ici le contenu de apify/pageFunction.js",

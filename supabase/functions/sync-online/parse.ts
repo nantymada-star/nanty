@@ -76,21 +76,21 @@ const GROUPS: [string, RegExp][] = [
   ['yaourt', /\b(yaourt|yogh?ourt|yogurt)\b/],
   ['bebe', /\b(bebe|baby|infantile|couches?)\b/],
   ['riz', /\b(riz|vary|rice|basmati)\b/],
-  ['huile', /\b(huile|oil|menaka)\b(?!.*\b(moteur|essentielle|massage|cheveux|corps)\b)/],
+  ['huile', /\b(huile|oil|menaka)\b(?!.*\b(moteur|essentielle|massage|cheveux|corps|cire|epilat|argan|solaire|bronzante)\b)/],
   ['farine', /\b(farine|lafarinina|flour)\b/],
   ['pates', /\b(pates?|spaghetti|macaroni|coquillettes?|nouilles?|vermicelles?|mi ?sao|noodles?)\b/],
   ['lait', /\b(lait|ronono|milk)\b/],
   ['fromage-beurre', /\b(fromage|beurre|cheese|butter|margarine)\b/],
   ['cafe-the', /\b(cafe|coffee|the (vert|noir|nature)|tea|infusion|cacao)\b/],
-  ['sucre', /\b(sucre|siramamy|sugar)\b/],
+  ['hygiene', /\b(dentifrice|cire|epilat\w*|shampo+ing|shampoo|deodorant|papier hygienique|serviettes? hygieniques?|coton)\b/],
+  ['eau', /\b(eau|water|rano)\b/],
+  ['boisson', /\b(jus|juice|soda|coca|fanta|sprite|boissons?|limonade|sirop|tonic|energy|biere|three horses|thb)\b/],
+  ['sucre', /\b(sucres?|edulcorants?|siramamy|sugar)\b/],
   ['sel-epices', /\b(sel|sira|poivre|curry|cubes?|bouillon|epices?|ketchup|mayonnaise|moutarde|vinaigre|sauce|essence|condiments?)\b/],
   ['haricot', /\b(haricots?|niebe|pois|lentilles?|tsaramaso|voanjobory)\b/],
   ['mais', /\b(mais|katsaka|corn)\b/],
-  ['eau', /\b(eau|water|rano)\b/],
-  ['boisson', /\b(jus|juice|soda|coca|fanta|sprite|boissons?|limonade|sirop|tonic|energy|biere|three horses|thb)\b/],
   ['biscuit-snack', /\b(biscuits?|gateaux?|cookies?|chips|snacks?|bhujia|crackers?|bonbons?|chocolats?|friandises?|chewing)\b/],
   ['savon-lessive', /\b(savon|lessive|detergent|javel|vaisselle|nettoyant|lave|soap|entretien)\b/],
-  ['hygiene', /\b(dentifrice|shampo+ing|shampoo|deodorant|papier hygienique|serviettes? hygieniques?|coton)\b/],
   ['oeuf', /\b(oeufs?|atody)\b/],
   ['viande-poisson', /\b(viande|poulet|boeuf|porc|poisson|crevettes?|saucisses?|jambon|akoho|trondro)\b/],
   ['fruits-legumes', /\b(tomates?|oignons?|carottes?|pommes? de terre|legumes?|fruits?|bananes?|ail|tongolo)\b/],
@@ -101,9 +101,11 @@ export function fold(s: string) {
   return s.toLowerCase().replace(/œ/g, 'oe').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
+/** Rayon d'après le nom du produit ; le nom de la catégorie du site ne sert qu'en dernier recours. */
 export function productGroup(name: string, category = ''): string | null {
-  const s = fold(`${name} ${category}`)
-  for (const [g, re] of GROUPS) if (re.test(s)) return g
+  for (const text of [fold(name), fold(`${name} ${category}`)]) {
+    for (const [g, re] of GROUPS) if (re.test(text)) return g
+  }
   return null
 }
 

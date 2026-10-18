@@ -72,3 +72,12 @@ describe('prix en ligne : exclusions', () => {
     expect(normalizeItem('s', { name: 'Cafetière 1.2L VISTA', price: 90000, categories: ['Petit déjeuner', 'Cafetières'] })).toBeNull()
   })
 })
+
+describe('prix en ligne : pages KIBO', () => {
+  it('classe d’après le nom avant la catégorie', () => {
+    expect(productGroup('Boisson aloe vera king zéro sucre original 500ml', 'Sucres')).toBe('boisson')
+    expect(productGroup("Cire orientale à l'huile d'argan et au sucre 250ml", 'Sucres')).toBe('hygiene')
+    expect(productGroup('Sucre roux en poudre 1kg', 'Sucres')).toBe('sucre')
+    expect(productGroup('Edulcorant à la sucralose 120 sticks', 'Sucres')).toBe('sucre')
+  })
+})

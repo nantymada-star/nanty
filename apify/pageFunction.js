@@ -10,7 +10,7 @@ async function pageFunction(context) {
   const category = $('h1').first().text().trim() || document.title
   const abs = (u) => { try { return u ? new URL(u, location.href).href : null } catch { return null } }
   const text = (el, sel) => $(el).find(sel).first().text().replace(/\s+/g, ' ').trim()
-  const out = []
+  const jsonld = [], presta = [], woo = []
 
   // 1) JSON-LD
   $('script[type="application/ld+json"]').each((_, s) => {
@@ -20,7 +20,7 @@ async function pageFunction(context) {
     for (const p of list) {
       if (!p || p['@type'] !== 'Product') continue
       const offer = [].concat(p.offers || [])[0] || {}
-      out.push({
+      jsonld.push({
         ref: p.sku || p.productID || abs(p.url) || null, name: p.name, price: offer.price ?? offer.lowPrice ?? null,
         currency: offer.priceCurrency || 'MGA', url: abs(p.url) || request.url, image: abs([].concat(p.image || [])[0]),
         category, inStock: offer.availability ? /InStock/i.test(offer.availability) : null,
@@ -31,7 +31,7 @@ async function pageFunction(context) {
   // 2) PrestaShop
   $('.product-miniature, article[data-id-product]').each((_, el) => {
     const a = $(el).find('.product-title a, h2 a, h3 a').first()
-    out.push({
+    presta.push({
       ref: $(el).attr('data-id-product') || abs(a.attr('href')), name: a.text().trim() || text(el, '.product-title'),
       price: text(el, '.price, [itemprop="price"]'), currency: 'MGA', url: abs(a.attr('href')),
       image: abs($(el).find('img').first().attr('data-src') || $(el).find('img').first().attr('src')),
@@ -43,7 +43,7 @@ async function pageFunction(context) {
   $('li.product, .wc-block-grid__product').each((_, el) => {
     const a = $(el).find('a.woocommerce-LoopProduct-link, a').first()
     const priceEl = $(el).find('.price ins .amount, .price .amount, .wc-block-grid__product-price').first()
-    out.push({
+    woo.push({
       ref: $(el).find('[data-product_id]').attr('data-product_id') || abs(a.attr('href')),
       name: text(el, '.woocommerce-loop-product__title, h2, h3, .wc-block-grid__product-title'),
       price: priceEl.text().trim(), currency: 'MGA', url: abs(a.attr('href')),
@@ -52,6 +52,8 @@ async function pageFunction(context) {
     })
   })
 
+  // Une seule méthode par page (vignettes du CMS en priorité) pour éviter les doublons d'identifiants
+  const out = presta.length ? presta : woo.length ? woo : jsonld
   const items = out.filter((x) => x.name && x.price)
   log.info(`${items.length} produit(s) sur ${request.url}`)
   return items
