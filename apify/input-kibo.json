@@ -1,0 +1,31 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.kibo.mg/"
+    }
+  ],
+  "linkSelector": "a[href]",
+  "globs": [
+    {
+      "glob": "https://www.kibo.mg/*[0-9]-*"
+    },
+    {
+      "glob": "https://www.kibo.mg/*?page=*"
+    }
+  ],
+  "excludes": [
+    {
+      "glob": "https://www.kibo.mg/*{order,tag,id_currency,search_query,back,controller}=*"
+    },
+    {
+      "glob": "https://www.kibo.mg/*.{jpg,png,css,js}"
+    }
+  ],
+  "pageFunction": "// MadaPrice — fonction de page pour l'acteur Apify « Web Scraper » (apify/web-scraper).\n// Extrait les produits d'une page de catégorie ou de produit, quel que soit le CMS :\n//   1) données structurées schema.org (JSON-LD « Product »),\n//   2) vignettes PrestaShop (.product-miniature : KIBO…),\n//   3) vignettes WooCommerce (li.product : Supermarché.mg…).\n// Chaque élément renvoyé : { ref, name, price, currency, url, image, category, inStock }.\n// La fonction serveur sync-online lit ce jeu de données et ne garde que les prix en Ariary.\nasync function pageFunction(context) {\n  const { request, log, jQuery: $ } = context\n  const category = $('h1').first().text().trim() || document.title\n  const abs = (u) => { try { return u ? new URL(u, location.href).href : null } catch { return null } }\n  const text = (el, sel) => $(el).find(sel).first().text().replace(/\\s+/g, ' ').trim()\n  const out = []\n\n  // 1) JSON-LD\n  $('script[type=\"application/ld+json\"]').each((_, s) => {\n    let data\n    try { data = JSON.parse(s.textContent) } catch { return }\n    const list = [].concat(data['@graph'] || data).flatMap((d) => (d['@type'] === 'ItemList' ? (d.itemListElement || []).map((x) => x.item || x) : [d]))\n    for (const p of list) {\n      if (!p || p['@type'] !== 'Product') continue\n      const offer = [].concat(p.offers || [])[0] || {}\n      out.push({\n        ref: p.sku || p.productID || abs(p.url) || null, name: p.name, price: offer.price ?? offer.lowPrice ?? null,\n        currency: offer.priceCurrency || 'MGA', url: abs(p.url) || request.url, image: abs([].concat(p.image || [])[0]),\n        category, inStock: offer.availability ? /InStock/i.test(offer.availability) : null,\n      })\n    }\n  })\n\n  // 2) PrestaShop\n  $('.product-miniature, article[data-id-product]').each((_, el) => {\n    const a = $(el).find('.product-title a, h2 a, h3 a').first()\n    out.push({\n      ref: $(el).attr('data-id-product') || abs(a.attr('href')), name: a.text().trim() || text(el, '.product-title'),\n      price: text(el, '.price, [itemprop=\"price\"]'), currency: 'MGA', url: abs(a.attr('href')),\n      image: abs($(el).find('img').first().attr('data-src') || $(el).find('img').first().attr('src')),\n      category, inStock: $(el).find('.out-of-stock, .product-unavailable').length ? false : null,\n    })\n  })\n\n  // 3) WooCommerce\n  $('li.product, .wc-block-grid__product').each((_, el) => {\n    const a = $(el).find('a.woocommerce-LoopProduct-link, a').first()\n    const priceEl = $(el).find('.price ins .amount, .price .amount, .wc-block-grid__product-price').first()\n    out.push({\n      ref: $(el).find('[data-product_id]').attr('data-product_id') || abs(a.attr('href')),\n      name: text(el, '.woocommerce-loop-product__title, h2, h3, .wc-block-grid__product-title'),\n      price: priceEl.text().trim(), currency: 'MGA', url: abs(a.attr('href')),\n      image: abs($(el).find('img').first().attr('src')), category,\n      inStock: $(el).hasClass('outofstock') ? false : $(el).hasClass('instock') ? true : null,\n    })\n  })\n\n  const items = out.filter((x) => x.name && x.price)\n  log.info(`${items.length} produit(s) sur ${request.url}`)\n  return items\n}\n",
+  "injectJQuery": true,
+  "maxRequestsPerCrawl": 3000,
+  "maxConcurrency": 2,
+  "proxyConfiguration": {
+    "useApifyProxy": true
+  }
+}
