@@ -132,6 +132,14 @@ Ajout pur : les prix PAM/WFP, leurs tables et leur synchronisation ne sont pas m
 - **Garde-fous** : prix en Ariary uniquement, entre 50 Ar et 50 M Ar ; électroménager exclu ; variation ×3 ou ÷3 marquée « suspecte » ; un prix non revu depuis 7 jours passe en « Tranainy ». Badge « Hita an-tserasera / Affiché en ligne », jamais « Voamarina ».
 - **Lien avec le PAM** : la fiche d'un produit PAM (riz, huile, haricots, maïs) affiche les produits emballés du même rayon, avec la mention qu'ils ne sont pas directement comparables au prix du marché.
 
+### Comparaison entre boutiques (série 4)
+
+- **Rapprochement** : chaque produit reçoit une clé `match_key`, soit son code-barres EAN vérifié (lu dans l'adresse KIBO `…-7622210449283.html`), soit les mots de son nom triés sans accents ni contenance + la contenance normalisée. La vue `online_matches` liste les produits vendus par au moins deux boutiques (écran « Mampitaha fivarotana »).
+- **Valeurs suspectes** : même règle que le PAM, ×3 ou ÷3 de la médiane, sur l'historique du produit (≥ 4 relevés) et sur le même produit ailleurs (≥ 3 offres). Fonction `online_flag_outliers`, appelée à chaque collecte.
+- **Dans l'application** : fiche produit en ligne avec « même produit ailleurs » et alerte « me prévenir sous X Ar » ; section « en ligne » dans Comparer et sur la fiche PAM ; alertes listées avec les autres.
+- **Hors ligne** : copie locale (IndexedDB, table `onlineProducts`) mise à jour au plus toutes les 6 h ; l'écran bascule dessus sans réseau.
+- **Pilotage Apify** depuis Admin (ou `sync-online` avec `{"action":"apify-start"|"apify-status","shop":"kibo"}`) : le serveur trouve la tâche dont le nom contient l'identifiant de la boutique, peut y enregistrer l'entrée `apify/input-*.json` et la lancer.
+
 ### Ajouter Apify (KIBO, Supermarché.mg)
 
 1. Créer un compte sur https://console.apify.com (offre gratuite).
