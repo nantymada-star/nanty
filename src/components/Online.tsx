@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useT } from '../i18n'
@@ -7,7 +7,9 @@ import { useAuth } from '../lib/auth'
 import { errText, supabase, SUPABASE_URL } from '../lib/supabase'
 import { useServer } from '../lib/useServer'
 import { fmtAr, fmtDateTime, fmtDay } from '../lib/format'
-import { groupForCommodity, isStaleOnline, type OnlineProduct, type OnlineShop } from '../lib/online'
+import { groupForCommodity, isStaleOnline, spreadPct, type OnlineMatch, type OnlineProduct, type OnlineShop } from '../lib/online'
+import { db } from '../lib/db'
+import { localOffers } from '../lib/onlineCache'
 
 export function OnlineBadge({ p }: { p: Pick<OnlineProduct, 'last_seen_at'> }) {
   const { t } = useT()
@@ -63,9 +65,102 @@ function OnlineDetail({ p }: { p: OnlineProduct }) {
           </ResponsiveContainer>
         </div>
       )}
-      {p.url && <a className="btn small secondary" href={p.url} target="_blank" rel="noopener noreferrer"><Icon name="globe" size={14} /> {t('openShop')}</a>}
+      {p.match_key && <OtherOffers p={p} />}
+      <div className="row wrap">
+        {p.url && <a className="btn small secondary" href={p.url} target="_blank" rel="noopener noreferrer"><Icon name="globe" size={14} /> {t('openShop')}</a>}
+        {p.match_key && <OnlineAlertButton p={p} />}
+      </div>
     </div>
   )
+}
+
+/** Offres du même produit (même code-barres, ou même nom et contenance) dans les autres boutiques. */
+function OtherOffers({ p }: { p: OnlineProduct }) {
+  const { t, lang } = useT()
+  const [offline, setOffline] = useState<OnlineProduct[] | null>(null)
+  const { data, error } = useServer<OnlineProduct[]>(
+    () => supabase?.from('online_products').select('*').eq('match_key', p.match_key!).order('price').limit(20) ?? null, [p.match_key], ['online_products'])
+  useEffect(() => { if (error) localOffers(p.match_key!).then(setOffline).catch(() => setOffline([])) }, [error, p.match_key])
+  const { data: shops } = useServer<OnlineShop[]>(() => supabase?.from('online_shops').select('*') ?? null, [])
+  const rows = (data ?? offline ?? []).filter((x) => x.id !== p.id)
+  if (!rows.length) return <small className="muted">{t('noOtherShop')}</small>
+  const all = [p, ...rows].filter((x) => !x.suspect).map((x) => Number(x.price))
+  const min = Math.min(...all)
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <b style={{ fontSize: 14 }}>{t('sameProductElsewhere')}{p.barcode ? ` · ${t('barcode')} ${p.barcode}` : ''}</b>
+      <ul className="list">
+        {rows.map((x) => (
+          <li key={x.id} className="row between" style={{ fontSize: 13.5 }}>
+            <span>{shops?.find((sh) => sh.id === x.shop_id)?.name ?? x.shop_id} · <span className="muted">{fmtDay(x.last_seen_at, lang)}</span>{x.suspect && <> <span className="badge b-declared">{t('suspect')}</span></>}</span>
+            <b className={`num ${Number(x.price) === min ? 'down' : ''}`}>{fmtAr(Number(x.price))}</b>
+          </li>
+        ))}
+      </ul>
+      {Number(p.price) > min && <small className="down">{t('cheaperElsewhere', { v: fmtAr(Number(p.price) - min) })}</small>}
+    </div>
+  )
+}
+
+/** Alerte locale : prévenir quand ce produit (toutes boutiques) passe sous un prix. */
+function OnlineAlertButton({ p }: { p: OnlineProduct }) {
+  const { t } = useT()
+  const [th, setTh] = useState(String(Math.max(50, Math.round(Number(p.price) * 0.95))))
+  const [done, setDone] = useState(false)
+  if (done) return <span className="badge b-verified"><Icon name="check" size={12} /> {t('alertCreated')}</span>
+  return (
+    <span className="row" style={{ gap: 6 }}>
+      <input type="number" min={50} value={th} onChange={(e) => setTh(e.target.value)} style={{ width: 110 }} aria-label={t('threshold')} />
+      <button className="btn small" onClick={async () => {
+        const v = Number(th)
+        if (!(v > 0)) return
+        await db.alerts.add({ commodityCode: '', marketCode: '*', unit: p.size_unit ?? '', priceType: 'online', kind: 'online', onlineKey: p.match_key, product: p.name, threshold: v, active: true, createdAt: new Date().toISOString() })
+        setDone(true)
+      }}><Icon name="bell" size={14} /> {t('alertBelow')}</button>
+    </span>
+  )
+}
+
+/** Comparaison entre boutiques : produits vendus par au moins deux boutiques, triés par écart de prix. */
+export function OnlineMatches({ group, q }: { group?: string; q?: string }) {
+  const { t, lang } = useT()
+  const [open, setOpen] = useState<string | null>(null)
+  const { data, loading } = useServer<OnlineMatch[]>(() => {
+    if (!supabase) return null
+    let r = supabase.from('online_matches').select('*')
+    if (group && group !== 'other') r = r.eq('product_group', group)
+    if (q) for (const w of q.split(/\s+/).filter((x) => x.length > 1).slice(0, 4)) r = r.ilike('name', `%${w}%`)
+    return r.order('shops', { ascending: false }).order('max_price', { ascending: false }).limit(100)
+  }, [group, q], ['online_products'])
+  const list = [...(data ?? [])].sort((a, b) => (spreadPct(b) ?? 0) - (spreadPct(a) ?? 0))
+  if (loading && !data) return <div className="empty"><span className="spinner" /></div>
+  if (!list.length) return <div className="card"><small>{t('noMatches')}</small></div>
+  return (
+    <div className="card" style={{ paddingBlock: 0 }}>
+      <ul className="list">
+        {list.map((m) => (
+          <li key={m.match_key} className="stack" style={{ gap: 6 }}>
+            <button className="row between" style={{ background: 'none', border: 0, width: '100%', padding: '10px 0', textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit' }} onClick={() => setOpen(open === m.match_key ? null : m.match_key)} aria-expanded={open === m.match_key}>
+              <span style={{ minWidth: 0 }}>
+                <b>{m.name}</b>
+                <div><small className="muted">{m.shops} {t('shopsCount')}{m.barcode ? ` · ${t('barcode')} ${m.barcode}` : ''} · {fmtDay(m.last_seen_at, lang)}</small></div>
+              </span>
+              <span style={{ textAlign: 'right' }}>
+                <span className="num"><b className="down">{m.min_price != null ? fmtAr(Number(m.min_price)) : '—'}</b> – <b className="up">{m.max_price != null ? fmtAr(Number(m.max_price)) : '—'}</b></span>
+                {spreadPct(m) != null && <div><small className="muted">{t('spread')} {spreadPct(m)} %</small></div>}
+              </span>
+            </button>
+            {open === m.match_key && <MatchOffers matchKey={m.match_key} />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function MatchOffers({ matchKey }: { matchKey: string }) {
+  const { data } = useServer<OnlineProduct[]>(() => supabase?.from('online_products').select('*').eq('match_key', matchKey).order('price') ?? null, [matchKey])
+  return <ul className="list">{data?.map((p) => <OnlineRow key={p.id} p={p} />)}</ul>
 }
 
 /** Sur la fiche d'un produit PAM : produits emballés du même rayon vendus en ligne (riz, huile, haricots, maïs). */
@@ -114,6 +209,20 @@ export function OnlineAdmin() {
     } catch (e) { setMsg((e as Error).message) } finally { setBusy(null) }
   }
 
+  // Pilotage d'Apify par le serveur (le jeton Apify reste un secret côté serveur)
+  const apify = async (action: 'apify-start' | 'apify-status', shop: string) => {
+    setBusy(shop); setMsg('')
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/sync-online`, {
+        method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, shop }),
+      })
+      const j = await res.json().catch(() => ({}))
+      const r = j.run
+      setMsg(j.ok && r ? `${j.task} : ${r.status}${r.items != null ? ` · ${r.items} ${t('productsCount')}` : ''}${r.finishedAt ? ` · ${fmtDateTime(r.finishedAt, lang)}` : ''}` : j.error ?? `HTTP ${res.status}`)
+    } catch (e) { setMsg((e as Error).message) } finally { setBusy(null) }
+  }
+
   return (
     <div className="card stack">
       <div className="row between"><h2>{t('shopsAdmin')}</h2>
@@ -131,7 +240,13 @@ export function OnlineAdmin() {
               <input defaultValue={s.config.task ?? ''} placeholder={t('apifyTask')} aria-label={t('apifyTask')} maxLength={120}
                 onBlur={(e) => { const v = e.target.value.trim(); if (v !== (s.config.task ?? '')) save(s, { config: { ...s.config, task: v || undefined } }) }} />
             )}
-            <button className="btn small ghost" disabled={!!busy} onClick={() => runNow(s.id)}>{busy === s.id ? <span className="spinner" /> : <Icon name="refresh" size={14} />} {s.name}</button>
+            <div className="row wrap">
+              <button className="btn small ghost" disabled={!!busy} onClick={() => runNow(s.id)}>{busy === s.id ? <span className="spinner" /> : <Icon name="refresh" size={14} />} {s.kind === 'apify' ? t('importApify') : s.name}</button>
+              {s.kind === 'apify' && <>
+                <button className="btn small ghost" disabled={!!busy} onClick={() => apify('apify-start', s.id)}><Icon name="plus" size={14} /> {t('startApify')}</button>
+                <button className="btn small ghost" disabled={!!busy} onClick={() => apify('apify-status', s.id)}><Icon name="chart" size={14} /> {t('statusApify')}</button>
+              </>}
+            </div>
           </li>
         ))}
       </ul>

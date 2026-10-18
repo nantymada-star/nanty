@@ -152,6 +152,10 @@ async function syncShop(db: any, shop: Shop, trigger: string) {
         .upsert(chunk.map((r) => ({ product_id: r.id, seen_on: today, price: r.price })), { onConflict: 'product_id,seen_on' })
       if (e2) throw e2
     }
+    // Valeurs suspectes par médiane (historique du produit, même produit dans les autres boutiques)
+    const { data: flagged, error: e3 } = await db.rpc('online_flag_outliers', { p_shop: shop.id })
+    if (e3) throw e3
+    suspects = Number(flagged ?? suspects)
     await db.from('online_shops').update({ last_run_at: now }).eq('id', shop.id)
     const msg = [rejected ? `${rejected} ligne(s) rejetée(s)` : null, note].filter(Boolean).join(' · ') || null
     await finish({ status: 'success', fetched: raw.length, inserted, updated, suspects, attempts: 1, error: msg })

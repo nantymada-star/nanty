@@ -1,3 +1,4 @@
+import type { OnlineProduct } from './online'
 import Dexie, { type EntityTable } from 'dexie'
 
 /** Un relevé de prix réel (jamais modifié dans sa date d'origine). */
@@ -75,8 +76,11 @@ export interface PriceAlert {
   unit: string
   priceType: string
   /** season = avant le mois le plus cher (indice saisonnier réel) ; stock = produit déclaré disponible dans un commerce */
-  kind: 'rise' | 'drop' | 'below' | 'above' | 'new' | 'season' | 'stock'
+  /** online = produit d'une boutique en ligne passé sous le seuil (clé de rapprochement dans onlineKey) */
+  kind: 'rise' | 'drop' | 'below' | 'above' | 'new' | 'season' | 'stock' | 'online'
   threshold: number // % pour rise/drop, Ar pour below/above
+  /** Clé de rapprochement (online_products.match_key) pour les alertes « online ». */
+  onlineKey?: string
   /** Nom libre du produit pour les alertes « stock » (prix déclarés). */
   product?: string
   /** Dernière période ayant déclenché une alerte saisonnière (AAAA-MM). */
@@ -219,6 +223,7 @@ export const db = new Dexie('madaprice') as Dexie & {
   estimates: EntityTable<Estimate, 'id'>
   officialPrices: EntityTable<OfficialPrice, 'id'>
   fxRates: EntityTable<FxRate, 'id'>
+  onlineProducts: EntityTable<OnlineProduct, 'id'>
 }
 
 db.version(1).stores({
@@ -245,6 +250,11 @@ db.version(3).stores({
   estimates: 'id, item, market, date, [item+market]',
   officialPrices: '++id, key, effectiveFrom',
   fxRates: 'id, base, date',
+})
+
+// Prix des boutiques en ligne : copie locale pour le mode hors ligne (table séparée)
+db.version(4).stores({
+  onlineProducts: 'id, shop_id, product_group, match_key, last_seen_at',
 })
 
 /** Ajoute une consultation à l'historique (une seule entrée par élément, la plus récente). */

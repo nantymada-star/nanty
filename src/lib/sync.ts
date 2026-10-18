@@ -96,7 +96,7 @@ async function reflagSeries(touched: Observation[]) {
   return n
 }
 
-async function notify(title: string, body: string, kind: string, observedPeriod?: string, link?: string) {
+export async function notify(title: string, body: string, kind: string, observedPeriod?: string, link?: string) {
   await db.notifications.add({ createdAt: new Date().toISOString(), title, body, kind, observedPeriod, link, read: false })
   try {
     if (getSettings().notifConsent && 'Notification' in window && Notification.permission === 'granted') {

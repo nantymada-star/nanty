@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { Empty, PageHeader } from '../components/ui'
-import { OnlineRow } from '../components/Online'
+import { OnlineMatches, OnlineRow } from '../components/Online'
+import { queryLocalOnline, syncOnlineCache } from '../lib/onlineCache'
 import { supabase } from '../lib/supabase'
 import { useServer } from '../lib/useServer'
 import { fold } from '../../supabase/functions/sync-online/parse'
@@ -21,8 +22,12 @@ export default function Online() {
   const shop = params.get('shop') ?? ''
   const sort = (params.get('sort') as Sort) || 'unit'
   const [text, setText] = useState(q)
+  const tab = params.get('tab') === 'm' ? 'm' : 'p'
   const [limit, setLimit] = useState(PAGE)
+  const [local, setLocal] = useState<OnlineProduct[] | null>(null)
   useEffect(() => setLimit(PAGE), [q, group, shop, sort])
+  // Copie locale pour le mode hors ligne (au plus toutes les 6 h)
+  useEffect(() => { syncOnlineCache().catch(() => {}) }, [])
   const set = (k: string, v: string) => { const n = new URLSearchParams(params); if (v) n.set(k, v); else n.delete(k); setParams(n, { replace: true }) }
 
   const { data: shops } = useServer<OnlineShop[]>(() => supabase?.from('online_shops').select('*').order('name') ?? null, [], ['online_shops'])
@@ -36,6 +41,12 @@ export default function Online() {
     r = sort === 'unit' ? r.order('unit_price', { ascending: true, nullsFirst: false }) : sort === 'price' ? r.order('price') : r.order('last_changed_at', { ascending: false })
     return r.order('id').limit(limit)
   }, [q, group, shop, sort, limit], ['online_products'])
+  const offline = !!error || (typeof navigator !== 'undefined' && navigator.onLine === false)
+  useEffect(() => {
+    if (!offline) { setLocal(null); return }
+    queryLocalOnline({ q, group, shop, sort, limit }).then(setLocal).catch(() => setLocal([]))
+  }, [offline, q, group, shop, sort, limit])
+  const rows = offline ? local : data
 
   return (
     <div className="stack">
@@ -60,13 +71,19 @@ export default function Online() {
           <button key={g} role="tab" aria-selected={group === g} className={`chip ${group === g ? 'on' : ''}`} onClick={() => set('g', g)}>{t(groupKey(g === 'other' ? null : g))}</button>
         ))}
       </div>
-      {error && <div className="banner err">{error}</div>}
-      <div className="card" style={{ paddingBlock: 0 }}>
-        {!data?.length ? (loading ? <div className="empty"><span className="spinner" /></div> : <Empty icon="store">{t('noOnline')}</Empty>) : (
-          <ul className="list">{data.map((p) => <OnlineRow key={p.id} p={p} shop={shops?.find((s) => s.id === p.shop_id)} />)}</ul>
-        )}
+      <div className="chips" role="tablist">
+        <button role="tab" aria-selected={tab === 'p'} className={`chip ${tab === 'p' ? 'on' : ''}`} onClick={() => set('tab', '')}>{t('tabOffers')}</button>
+        <button role="tab" aria-selected={tab === 'm'} className={`chip ${tab === 'm' ? 'on' : ''}`} onClick={() => set('tab', 'm')}>{t('tabMatches')}</button>
       </div>
-      {data && data.length >= limit && <button className="btn secondary" onClick={() => setLimit(limit + PAGE)}>{t('seeAll')}</button>}
+      {offline && <div className="banner warn"><Icon name="wifiOff" /> {t('offlineCopy')}</div>}
+      {tab === 'm' ? <OnlineMatches group={group} q={fold(q)} /> : <>
+        <div className="card" style={{ paddingBlock: 0 }}>
+          {!rows?.length ? (loading && !offline ? <div className="empty"><span className="spinner" /></div> : <Empty icon="store">{t('noOnline')}</Empty>) : (
+            <ul className="list">{rows.map((p) => <OnlineRow key={p.id} p={p} shop={shops?.find((s) => s.id === p.shop_id)} />)}</ul>
+          )}
+        </div>
+        {rows && rows.length >= limit && <button className="btn secondary" onClick={() => setLimit(limit + PAGE)}>{t('seeAll')}</button>}
+      </>}
     </div>
   )
 }

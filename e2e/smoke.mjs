@@ -103,12 +103,17 @@ await page.route(SB + '/**', async (r) => {
     const all = [
       { id: 'bonmarche|1', shop_id: 'bonmarche', name: 'Riz Makalioka 5kg', url: 'https://bonmarche.mg/produit/riz', image_url: null, category: 'Riz', product_group: 'riz', size_qty: 5, size_unit: 'kg', price: 17500, unit_price: 3500, in_stock: true, suspect: null, first_seen_at: '2026-10-18T03:40:00Z', last_seen_at: new Date().toISOString(), last_changed_at: '2026-10-18T03:40:00Z', search_text: 'riz makalioka 5kg riz' },
       { id: 'bonmarche|2', shop_id: 'bonmarche', name: 'YAOURT IZI COCO 90G', url: null, image_url: null, category: 'Produit laitiers', product_group: 'yaourt', size_qty: 0.09, size_unit: 'kg', price: 900, unit_price: 10000, in_stock: true, suspect: null, first_seen_at: '2026-10-18T03:40:00Z', last_seen_at: new Date().toISOString(), last_changed_at: '2026-10-18T03:40:00Z', search_text: 'yaourt izi coco 90g' },
+      { id: 'kibo|3960', shop_id: 'kibo', name: 'Riz Makalioka 5 kg', url: null, image_url: null, category: 'Riz', product_group: 'riz', size_qty: 5, size_unit: 'kg', price: 16900, unit_price: 3380, in_stock: null, suspect: null, first_seen_at: '2026-10-18T14:00:00Z', last_seen_at: new Date().toISOString(), last_changed_at: '2026-10-18T14:00:00Z', search_text: 'riz makalioka 5 kg riz', match_key: 'n:makalioka riz|5kg' },
     ]
+    all[0].match_key = 'n:makalioka riz|5kg'
     if (req.headers()['prefer']?.includes('count')) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range', 'content-range': '0-1/2' }, body: '[]' })
+    const mk = u.searchParams.get('match_key')
+    if (mk) return ok(all.filter((x) => 'eq.' + x.match_key === mk).sort((a, b) => a.price - b.price))
     const g = u.searchParams.get('product_group')
     const q = u.searchParams.get('search_text')
     return ok(all.filter((x) => (!g || g === 'eq.' + x.product_group) && (!q || x.search_text.includes(q.replace(/^ilike\.%|%$/g, '')))))
   }
+  if (table === 'online_matches') return ok([{ match_key: 'n:makalioka riz|5kg', name: 'Riz Makalioka 5kg', barcode: null, size_qty: 5, size_unit: 'kg', product_group: 'riz', shops: 2, offers: 2, min_price: 16900, max_price: 17500, last_seen_at: new Date().toISOString() }])
   if (table === 'online_price_points') return ok([{ seen_on: '2026-10-17', price: 17000 }, { seen_on: '2026-10-18', price: 17500 }])
   if (path.startsWith('/rest/v1/rpc/')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
   return ok([])
@@ -313,7 +318,18 @@ await page.getByRole('tab', { name: 'Yaourt' }).click()
 checks.onlineFilter = await page.waitForFunction(() => document.body.innerText.includes('YAOURT IZI COCO') && !document.body.innerText.includes('Riz Makalioka'), null, { timeout: 5000 }).then(() => true, () => false)
 await page.getByText('YAOURT IZI COCO 90G').click()
 await page.waitForTimeout(300)
+await page.goto(B + '/an-tserasera')
+await page.getByText('Riz Makalioka 5kg').first().click()
+checks.sameElsewhere = await has('Vokatra mitovy any amin') && await has('Mora kokoa 600 Ar any an-kafa')
+await page.getByRole('button', { name: /Ampandrenesy raha latsaka/ }).click()
+checks.onlineAlert = await has('Voaforona ny fanairana')
 await shot('42-online')
+await page.getByRole('tab', { name: 'Mampitaha fivarotana' }).click()
+checks.onlineMatches = await has('2 fivarotana') && await has('elanelana 4 %')
+await shot('44-online-matches')
+await page.goto(B + '/fanairana')
+await page.getByRole('button', { name: /Ny fanairako/ }).click()
+checks.onlineAlertListed = await has('Vidiny an-tserasera latsaka')
 await page.goto(B + '/admin')
 checks.onlineAdmin = await has('Fivarotana an-tserasera') && await has('BonMarche.mg')
 await shot('43-online-admin')

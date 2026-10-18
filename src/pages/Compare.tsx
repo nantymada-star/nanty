@@ -4,6 +4,7 @@ import { useT } from '../i18n'
 import { Empty, PageHeader, SeriesRow, SyncStatus, useFreshness } from '../components/ui'
 import { useData } from '../lib/data'
 import { CommodityEnrichment } from '../components/Enrichment'
+import { OnlineForCommodity } from '../components/Online'
 import { useSettings } from '../lib/settings'
 import { haversineKm, summarize } from '../lib/stats'
 import { categoryLabel, commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -119,6 +120,7 @@ export default function Compare() {
       )}
       <small>{t('comparableNote')}</small>
       {com && <CommodityEnrichment commodityName={com.name} />}
+      {com && <OnlineForCommodity code={com.code} />}
       {sort === 'profit' && <div className="banner info">{t('gapHelp')} <Link className="btn small" to="/faritra">{t('qRegions')}</Link></div>}
 
       <div className="card" style={{ paddingBlock: 0 }}>

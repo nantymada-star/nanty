@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromApify, fromWoo, normalizeItem, parsePrice, parseSize, productGroup, suspectChange } from '../../supabase/functions/sync-online/parse'
+import { extractBarcode, fromApify, fromWoo, normalizeItem, parsePrice, parseSize, productGroup, suspectChange, validEan } from '../../supabase/functions/sync-online/parse'
 
 describe('prix en ligne : lecture', () => {
   it('lit les prix en Ariary', () => {
@@ -79,5 +79,28 @@ describe('prix en ligne : pages KIBO', () => {
     expect(productGroup("Cire orientale à l'huile d'argan et au sucre 250ml", 'Sucres')).toBe('hygiene')
     expect(productGroup('Sucre roux en poudre 1kg', 'Sucres')).toBe('sucre')
     expect(productGroup('Edulcorant à la sucralose 120 sticks', 'Sucres')).toBe('sucre')
+  })
+})
+
+describe('prix en ligne : rapprochement entre boutiques', () => {
+  it('lit et vérifie le code-barres', () => {
+    expect(extractBarcode('https://www.kibo.mg/tananarive/biscuits/3960-biscuits-prince-300g-7622210449283.html', '3960')).toBe('7622210449283')
+    expect(extractBarcode('https://www.kibo.mg/tananarive/x/1-produit-7622210449284.html', '1')).toBeNull()
+    expect(validEan('3250390819455')).toBe('3250390819455')
+    expect(validEan('96385074')).toBe('96385074')
+    expect(validEan('1234')).toBeNull()
+  })
+  it('clé identique pour le même produit écrit différemment', () => {
+    const a = normalizeItem('a', { ref: 1, name: 'Huile Tournesol LESIEUR 1L', price: 9900 })!
+    const b = normalizeItem('b', { ref: 2, name: 'LESIEUR huile de tournesol 1 L', price: 10500 })!
+    expect(a.match_key).toBe(b.match_key)
+    expect(a.match_key).toBe('n:huile lesieur tournesol|1L')
+    const c = normalizeItem('c', { ref: 3, name: 'LESIEUR huile de tournesol 5 L', price: 45000 })!
+    expect(c.match_key).not.toBe(a.match_key)
+  })
+  it('clé par code-barres quand il existe', () => {
+    const p = normalizeItem('kibo', { ref: '3960', name: 'Biscuits Prince 300g', price: 10900, url: 'https://www.kibo.mg/tananarive/b/3960-biscuits-prince-300g-7622210449283.html' })!
+    expect(p.barcode).toBe('7622210449283')
+    expect(p.match_key).toBe('ean:7622210449283')
   })
 })

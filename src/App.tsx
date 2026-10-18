@@ -12,6 +12,7 @@ import { subscribeServerPrices } from './lib/serverSync'
 import { db } from './lib/db'
 import { useSettings } from './lib/settings'
 import { syncIfDue, syncWfp } from './lib/sync'
+import { syncOnlineCache } from './lib/onlineCache'
 import Home from './pages/Home'
 import Onboarding from './pages/Onboarding'
 
@@ -44,7 +45,10 @@ function useAutoSync() {
     if (!s.onboarded) return
     const every = Math.max(5, s.autoSyncMinutes)
     syncIfDue(every, 'auto')
-    const i = setInterval(() => syncIfDue(every, 'interval'), 60000)
+    // Prix des boutiques en ligne : copie locale (hors ligne) et alertes, au plus toutes les 6 h
+    const onlineCache = () => { syncOnlineCache().catch(() => {}) }
+    onlineCache()
+    const i = setInterval(() => { syncIfDue(every, 'interval'); onlineCache() }, 60000)
     const online = () => syncWfp('online')
     const vis = () => document.visibilityState === 'visible' && syncIfDue(every, 'visible')
     window.addEventListener('online', online)

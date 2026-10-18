@@ -47,7 +47,7 @@ export default function Alerts() {
     setTab('a')
   }
   const kindLabel = (a: PriceAlert) => {
-    const k = { rise: 'kRise', drop: 'kDrop', below: 'kBelow', above: 'kAbove', new: 'kNew', season: 'kSeason', stock: 'kStock' } as const
+    const k = { rise: 'kRise', drop: 'kDrop', below: 'kBelow', above: 'kAbove', new: 'kNew', season: 'kSeason', stock: 'kStock', online: 'kOnline' } as const
     const base = t(k[a.kind])
     return a.kind === 'new' || a.kind === 'season' || a.kind === 'stock' ? base : a.kind === 'rise' || a.kind === 'drop' ? `${base} ${a.threshold}` : `${base} ${fmtAr(a.threshold)}`
   }
@@ -134,6 +134,7 @@ export default function Alerts() {
               <button className="btn" onClick={add}><Icon name="plus" size={16} /> {t('add')}</button>
             </div>
             {kind === 'stock' && <small>{t('stockAlertNote')}</small>}
+            <small><Link to="/an-tserasera">{t('onlineAlertNote')}</Link></small>
             {kind === 'season' && <small>{t('seasonIndexHelp')}</small>}
           </div>
           <div className="card" style={{ paddingBlock: 0 }}>
@@ -145,8 +146,8 @@ export default function Alerts() {
                   return (
                     <li key={a.id} className="row between">
                       <div>
-                        <b>{a.kind === 'stock' ? a.product : cc ? commodityLabel(cc.name, lang) : a.commodityCode}</b> · {mk?.name ?? t('anyMarket')}
-                        <div><small>{kindLabel(a)} · {unitLabel(a.unit, lang)} · {priceTypeLabel(a.priceType, lang)}</small></div>
+                        <b>{a.kind === 'stock' || a.kind === 'online' ? a.product : cc ? commodityLabel(cc.name, lang) : a.commodityCode}</b> · {a.kind === 'online' ? t('onlineShort') : mk?.name ?? t('anyMarket')}
+                        <div><small>{kindLabel(a)}{a.kind === 'online' ? '' : ` · ${unitLabel(a.unit, lang)} · ${priceTypeLabel(a.priceType, lang)}`}</small></div>
                       </div>
                       <div className="row">
                         <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={a.active} onChange={(e) => db.alerts.update(a.id!, { active: e.target.checked })} /><small>{a.active ? 'ON' : 'OFF'}</small></label>

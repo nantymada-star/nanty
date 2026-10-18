@@ -15,6 +15,9 @@ export interface OnlineProduct {
   unit_price: number | null
   in_stock: boolean | null
   suspect: string | null
+  barcode?: string | null
+  match_key?: string
+  search_text?: string
   first_seen_at: string
   last_seen_at: string
   last_changed_at: string
@@ -49,5 +52,24 @@ export const groupForCommodity = (code: string) => WFP_TO_GROUP[code] ?? null
 
 /** Ancienneté du dernier relevé en ligne : au-delà de 7 jours sans être revu, le prix est « ancien ». */
 export const isStaleOnline = (p: Pick<OnlineProduct, 'last_seen_at'>, now = Date.now()) => now - new Date(p.last_seen_at).getTime() > 7 * 86400000
+
+/** Même produit vendu par plusieurs boutiques (vue public.online_matches). */
+export interface OnlineMatch {
+  match_key: string
+  name: string
+  barcode: string | null
+  size_qty: number | null
+  size_unit: string | null
+  product_group: string | null
+  shops: number
+  offers: number
+  min_price: number | null
+  max_price: number | null
+  last_seen_at: string
+}
+
+/** Écart entre la boutique la moins chère et la plus chère, en % du prix le plus bas. */
+export const spreadPct = (m: Pick<OnlineMatch, 'min_price' | 'max_price'>) =>
+  m.min_price && m.max_price ? Math.round(((Number(m.max_price) - Number(m.min_price)) / Number(m.min_price)) * 100) : null
 
 export const unitLabelOnline = (u: OnlineProduct['size_unit']) => (u === 'pièce' ? 'pièce' : u ?? '')

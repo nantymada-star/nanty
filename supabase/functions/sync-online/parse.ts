@@ -28,6 +28,8 @@ export interface OnlineProduct {
   currency: string
   in_stock: boolean | null
   search_text: string
+  barcode: string | null
+  match_key: string
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ', rsquo: '’', lsquo: '‘', eacute: 'é', egrave: 'è', ecirc: 'ê', agrave: 'à', ccedil: 'ç' }
@@ -109,6 +111,34 @@ export function productGroup(name: string, category = ''): string | null {
   return null
 }
 
+/** Code-barres EAN-8/EAN-13/UPC valide (clé de contrôle vérifiée), sinon null. */
+export function validEan(code: string) {
+  if (!/^(\d{8}|\d{12,14})$/.test(code) || /^0+$/.test(code)) return null
+  const d = code.split('').map(Number)
+  const check = d.pop()!
+  const sum = d.reverse().reduce((s, x, i) => s + x * (i % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === check ? code : null
+}
+
+/** Code-barres lu dans l'adresse du produit (« …-7622210449283.html » chez KIBO) ou dans la référence. */
+export function extractBarcode(url: string | null | undefined, ref: string | null | undefined) {
+  const m = (url ?? '').match(/[-/](\d{8}|\d{12,14})(?:\.html?)?(?:[?#].*)?$/)
+  return (m && validEan(m[1])) || validEan(String(ref ?? '').trim()) || null
+}
+
+const SIZE_TOKEN = /\b\d+(?:[.,]\d+)?\s*(?:x\s*\d+(?:[.,]\d+)?\s*)?(kg|g|gr|grs|gm|l|cl|ml|litres?|pcs?|pieces?|sachets?|sticks?)\b/g
+const STOP = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'au', 'aux', 'a', 'et', 'en', 'the', 'of', 'with', 'avec'])
+
+/**
+ * Clé de rapprochement entre boutiques : le code-barres s'il existe,
+ * sinon les mots du nom (sans accents, sans contenance, triés) + la contenance normalisée.
+ */
+export function matchKey(name: string, size: { qty: number; unit: 'kg' | 'L' } | null, barcode: string | null) {
+  if (barcode) return `ean:${barcode}`
+  const words = [...new Set(fold(name).replace(SIZE_TOKEN, ' ').replace(/[^a-z0-9]+/g, ' ').split(' ').filter((w) => w.length > 1 && !STOP.has(w)))].sort()
+  return `n:${words.join(' ')}|${size ? `${size.qty}${size.unit}` : '-'}`
+}
+
 /** Unité de comparaison : Ar/kg, Ar/L ; Ar/pièce pour le gaz (recharge) et les œufs. */
 export function unitPrice(price: number, size: { qty: number; unit: 'kg' | 'L' } | null, group: string | null) {
   if (size) return { size_qty: size.qty, size_unit: size.unit, unit_price: Math.round(price / size.qty) }
@@ -130,10 +160,12 @@ export function normalizeItem(shopId: string, it: RawItem): OnlineProduct | null
   const size = parseSize(name)
   const url = it.url && /^https?:\/\//.test(it.url) ? it.url : null
   const image = it.image && /^https?:\/\//.test(it.image) ? it.image : null
+  const barcode = extractBarcode(url, it.ref == null ? null : String(it.ref))
   return {
     id: `${shopId}|${ref}`.slice(0, 500), shop_id: shopId, ref: ref.slice(0, 400), name, url, image_url: image, category,
     product_group: group, ...unitPrice(price, size, group), price, currency, in_stock: it.inStock ?? null,
     search_text: fold(`${name} ${category}`),
+    barcode, match_key: matchKey(name, size, barcode),
   }
 }
 

@@ -532,6 +532,24 @@ const M = {
   'g_savon-lessive': ['Savony, fanasana', 'Savon, lessive, entretien'], g_hygiene: ['Fahadiovana', 'Hygiène'],
   g_oeuf: ['Atody', 'Œufs'], 'g_viande-poisson': ['Hena, trondro', 'Viande, poisson'], 'g_fruits-legumes': ['Voankazo, legioma', 'Fruits, légumes'],
   g_gaz: ['Entona (gaz)', 'Gaz butane'], g_other: ['Hafa', 'Autres'],
+  // comparaison entre boutiques (série 4)
+  noOtherShop: ['Tsy hita any amin\'ny fivarotana hafa io vokatra io.', 'Ce produit n’est pas trouvé dans une autre boutique.'],
+  sameProductElsewhere: ['Vokatra mitovy any amin\'ny fivarotana hafa', 'Même produit dans les autres boutiques'],
+  barcode: ['kaody', 'code-barres'],
+  cheaperElsewhere: ['Mora kokoa {v} any an-kafa', '{v} moins cher ailleurs'],
+  alertBelow: ['Ampandrenesy raha latsaka', 'M’alerter en dessous'],
+  alertCreated: ['Voaforona ny fanairana', 'Alerte créée'],
+  tabOffers: ['Vokatra', 'Produits'],
+  tabMatches: ['Mampitaha fivarotana', 'Comparer les boutiques'],
+  noMatches: ['Mbola tsy misy vokatra hita amin\'ny fivarotana roa farafahakeliny.', 'Aucun produit encore trouvé dans au moins deux boutiques.'],
+  shopsCount: ['fivarotana', 'boutiques'],
+  spread: ['elanelana', 'écart'],
+  importApify: ['Ampidiro ny vokatra Apify', 'Importer le résultat Apify'],
+  startApify: ['Alefaso ny fanangonana Apify', 'Lancer la collecte Apify'],
+  statusApify: ['Toetry ny Apify', 'État Apify'],
+  kOnline: ['Vidiny an-tserasera latsaka', 'Prix en ligne sous'],
+  onlineAlertNote: ["Ny fanairana « an-tserasera » dia foronina avy amin'ny pejin'ny vokatra an-tserasera.", 'Les alertes « en ligne » se créent depuis la fiche d’un produit en ligne.'],
+  offlineCopy: ['Tsy misy Internet — kopia voatahiry no aseho', 'Hors ligne — copie locale affichée'],
 } as const satisfies Record<string, readonly [string, string]>
 
 export type MsgKey = keyof typeof M
