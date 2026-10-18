@@ -76,12 +76,13 @@ async function resolveTask(db: any, shop: Shop): Promise<string> {
 }
 
 // deno-lint-ignore no-explicit-any
-async function collectApify(db: any, shop: Shop): Promise<{ items: RawItem[]; note: string | null }> {
+async function collectApify(db: any, shop: Shop, partial = false): Promise<{ items: RawItem[]; note: string | null }> {
   const auth = apifyAuth()
   const actor = shop.config.actor as string | undefined
   const task = actor ? undefined : await resolveTask(db, shop)
   const base = task ? `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}` : `https://api.apify.com/v2/acts/${encodeURIComponent(actor!)}`
-  const run = await getJson(`${base}/runs/last?status=SUCCEEDED`, auth)
+  // partial : exécution en cours acceptée (import anticipé, complété par l'import suivant)
+  const run = await getJson(`${base}/runs/last${partial ? '' : '?status=SUCCEEDED'}`, auth)
   const ds = run?.data?.defaultDatasetId
   if (!ds) throw new Error('Aucune exécution Apify réussie pour cette tâche')
   const items: RawItem[] = []
@@ -93,11 +94,12 @@ async function collectApify(db: any, shop: Shop): Promise<{ items: RawItem[]; no
   }
   const finished = run.data.finishedAt ? new Date(run.data.finishedAt) : null
   const ageDays = finished ? (Date.now() - finished.getTime()) / 86400000 : null
+  if (partial && run.data.status !== 'SUCCEEDED') return { items, note: `Import partiel : exécution Apify ${run.data.status}` }
   return { items, note: ageDays != null && ageDays > 3 ? `Dernière collecte Apify du ${finished!.toISOString().slice(0, 10)} (plus de 3 jours)` : null }
 }
 
 // deno-lint-ignore no-explicit-any
-async function syncShop(db: any, shop: Shop, trigger: string) {
+async function syncShop(db: any, shop: Shop, trigger: string, partial = false) {
   const t0 = Date.now()
   const { data: run } = await db.from('data_sync_runs').insert({ source: `online:${shop.id}`, trigger, status: 'running' }).select('id').single()
   const finish = (patch: Record<string, unknown>) =>
@@ -106,7 +108,7 @@ async function syncShop(db: any, shop: Shop, trigger: string) {
     let raw: RawItem[]
     let note: string | null = null
     if (shop.kind === 'woocommerce') raw = await collectWoo(shop)
-    else ({ items: raw, note } = await collectApify(db, shop))
+    else ({ items: raw, note } = await collectApify(db, shop, partial))
 
     const products = new Map<string, OnlineProduct>()
     let rejected = 0
@@ -230,6 +232,6 @@ Deno.serve(async (req) => {
   if (error) return json({ ok: false, error: error.message }, 500)
 
   const results = []
-  for (const s of (shops ?? []) as Shop[]) results.push(await syncShop(db, s, trigger))
+  for (const s of (shops ?? []) as Shop[]) results.push(await syncShop(db, s, trigger, body?.partial === true))
   return json({ ok: results.every((r) => r.ok), results })
 })
