@@ -157,11 +157,19 @@ Deno.serve(async (req) => {
     let inserted = 0
     let updated = 0
 
+    // Lignes déjà connues sur la même période : lues par pages (une liste d'id dans l'URL dépasserait sa longueur max)
+    const byId = new Map<string, { id: string; price: number; first_seen_at: string; last_verified_at: string; revisions: unknown[] | null }>()
+    for (let from = 0; ; from += 1000) {
+      const { data: page, error: e1 } = await db.from('price_observations')
+        .select('id, price, first_seen_at, last_verified_at, revisions')
+        .eq('source', 'wfp-hapi').gte('period_start', startDate).order('id').range(from, from + 999)
+      if (e1) throw e1
+      for (const x of page ?? []) byId.set(x.id, x)
+      if (!page || page.length < 1000) break
+    }
+
     for (let i = 0; i < rows.length; i += 500) {
       const chunk = rows.slice(i, i + 500)
-      const { data: existing, error: e1 } = await db.from('price_observations').select('id, price, first_seen_at, last_verified_at, revisions').in('id', chunk.map((r) => r.id as string))
-      if (e1) throw e1
-      const byId = new Map((existing ?? []).map((x) => [x.id, x]))
       const out = chunk.map((r) => {
         const cur = byId.get(r.id as string)
         if (!cur) { inserted++; return { ...r, first_seen_at: now, last_verified_at: now, revisions: [] } }
@@ -185,8 +193,10 @@ Deno.serve(async (req) => {
     await finish({ status: 'success', fetched: raw.length, inserted, updated, suspects, attempts: 1, error: rejected ? `${rejected} ligne(s) rejetée(s)` : null })
     return json({ ok: true, fetched: raw.length, inserted, updated, suspects, rejected, startDate })
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    await finish({ status: 'error', error: msg })
+    const o = e as { message?: string; details?: string; hint?: string; code?: string }
+    const msg = e instanceof Error ? e.message
+      : o?.message ? [o.code, o.message, o.details, o.hint].filter(Boolean).join(' · ') : JSON.stringify(e)
+    await finish({ status: 'error', error: msg.slice(0, 1000) })
     return json({ ok: false, error: msg }, 500)
   }
 })
