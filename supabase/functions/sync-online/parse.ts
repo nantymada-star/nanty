@@ -27,6 +27,7 @@ export interface OnlineProduct {
   unit_price: number | null
   currency: string
   in_stock: boolean | null
+  search_text: string
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ', rsquo: '’', lsquo: '‘', eacute: 'é', egrave: 'è', ecirc: 'ê', agrave: 'à', ccedil: 'ç' }
@@ -130,6 +131,7 @@ export function normalizeItem(shopId: string, it: RawItem): OnlineProduct | null
   return {
     id: `${shopId}|${ref}`.slice(0, 500), shop_id: shopId, ref: ref.slice(0, 400), name, url, image_url: image, category,
     product_group: group, ...unitPrice(price, size, group), price, currency, in_stock: it.inStock ?? null,
+    search_text: fold(`${name} ${category}`),
   }
 }
 

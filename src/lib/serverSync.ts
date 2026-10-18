@@ -99,7 +99,7 @@ export async function syncFromServer(trigger: string, onProgress?: (n: number) =
     const { data: markets } = await supabase.from('markets').select('*')
     if (markets?.length) await db.markets.bulkPut(markets.map((m) => ({ code: m.code, name: m.name, admin1: m.admin1, admin2: m.admin2, lat: m.lat, lon: m.lon })))
     // Dernière synchronisation serveur réussie (affichée à l'utilisateur)
-    const { data: lastRun } = await supabase.from('data_sync_runs').select('finished_at,status,error').eq('status', 'success').order('id', { ascending: false }).limit(1)
+    const { data: lastRun } = await supabase.from('data_sync_runs').select('finished_at,status,error').eq('source', 'wfp-hapi').eq('status', 'success').order('id', { ascending: false }).limit(1)
     run.inserted = fresh.length
     run.updated = run.fetched - fresh.length
     run.suspects = fresh.filter((o) => o.suspect).length

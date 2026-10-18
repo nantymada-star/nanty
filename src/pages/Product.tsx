@@ -8,6 +8,7 @@ import { Change, Empty, PageHeader, SeriesRow, StatusBadge, useFreshness } from 
 import { useData } from '../lib/data'
 import { CommodityEnrichment } from '../components/Enrichment'
 import { ApprovedSubmissions } from '../components/Shared'
+import { OnlineForCommodity } from '../components/Online'
 import { db, recordHistory, type PriceAlert } from '../lib/db'
 import { compKey, seriesKey } from '../lib/stats'
 import { categoryLabel, commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -215,6 +216,7 @@ export default function Product() {
       )}
 
       <ApprovedSubmissions code={code} market={marketCode} unit={unit} pt={pt} />
+      <OnlineForCommodity code={code} />
 
       <div className="section-title"><h2>{t('otherMarkets')}</h2></div>
       <div className="card" style={{ paddingBlock: 0 }}>

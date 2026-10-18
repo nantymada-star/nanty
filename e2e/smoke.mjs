@@ -24,7 +24,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || 
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, serviceWorkers: 'block' })
 const page = await ctx.newPage()
 const errors = []
-page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
+page.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); if (process.env.DEBUG) console.log('PAGEERROR', e.message) })
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()))
 await page.route('https://hapi.humdata.org/**', (r) => {
   const u = new URL(r.request().url()); hapiCalls.push(u.search)
@@ -73,7 +73,8 @@ await page.route(SB + '/**', async (r) => {
   const body = req.postData() ? JSON.parse(req.postData()) : null
   if (table === 'price_observations') return ok(u.searchParams.get('or') ? [] : serverRows)
   if (table === 'markets') return ok([...new Map(serverRows.map((x) => [x.market_code, { code: x.market_code, name: x.market_name, admin1: x.admin1, admin2: x.admin2, lat: x.lat, lon: x.lon }])).values()])
-  if (table === 'data_sync_runs') return ok([{ id: 1, status: 'success', trigger: 'cron', started_at: '2026-10-17T03:10:00Z', finished_at: '2026-10-17T03:11:00Z', duration_ms: 60000, fetched: serverRows.length, inserted: serverRows.length, updated: 0, error: null }])
+  if (table === 'data_sync_runs' && (u.searchParams.get('source') || '').startsWith('like.online')) return ok([{ id: 9, source: 'online:bonmarche', status: 'success', started_at: '2026-10-18T03:40:00Z', fetched: 174, inserted: 0, updated: 2, error: null }])
+  if (table === 'data_sync_runs') return ok([{ id: 1, source: 'wfp-hapi', status: 'success', trigger: 'cron', started_at: '2026-10-17T03:10:00Z', finished_at: '2026-10-17T03:11:00Z', duration_ms: 60000, fetched: serverRows.length, inserted: serverRows.length, updated: 0, error: null }])
   if (table === 'profiles') return ok(u.searchParams.get('id') ? { id: USER.id, email: USER.email, display_name: 'Nanty', role: 'admin', reputation: 0, created_at: '2026-10-17' } : [{ id: USER.id, email: USER.email, display_name: 'Nanty', role: 'admin', reputation: 0, created_at: '2026-10-17' }, { id: 'u2', email: 'rija@example.mg', display_name: 'Rija', role: 'user', reputation: 3, created_at: '2026-10-17' }])
   if (table === 'user_submissions') {
     if (method === 'POST') { sbState.inserted.push(body); return ok([{ ...body, id: 'new' }], 201) }
@@ -97,6 +98,18 @@ await page.route(SB + '/**', async (r) => {
     if (method === 'POST') { sbState.quotes.push({ id: 'q' + sbState.quotes.length, status: 'open', created_at: '2026-10-17T06:00:00Z', reply: null, replied_at: null, requester_id: USER.id, businesses: { name: 'Test Supermarket' }, ...body }); return ok([], 201) }
     return ok(sbState.quotes)
   }
+  if (table === 'online_shops') return ok([{ id: 'bonmarche', name: 'BonMarche.mg', url: 'https://bonmarche.mg', kind: 'woocommerce', config: {}, area: 'Antananarivo', enabled: true, note: 'API publique', last_run_at: '2026-10-18T03:40:00Z' }, { id: 'kibo', name: 'KIBO', url: 'https://www.kibo.mg', kind: 'apify', config: {}, area: 'Antananarivo', enabled: false, note: 'Apify', last_run_at: null }])
+  if (table === 'online_products') {
+    const all = [
+      { id: 'bonmarche|1', shop_id: 'bonmarche', name: 'Riz Makalioka 5kg', url: 'https://bonmarche.mg/produit/riz', image_url: null, category: 'Riz', product_group: 'riz', size_qty: 5, size_unit: 'kg', price: 17500, unit_price: 3500, in_stock: true, suspect: null, first_seen_at: '2026-10-18T03:40:00Z', last_seen_at: new Date().toISOString(), last_changed_at: '2026-10-18T03:40:00Z', search_text: 'riz makalioka 5kg riz' },
+      { id: 'bonmarche|2', shop_id: 'bonmarche', name: 'YAOURT IZI COCO 90G', url: null, image_url: null, category: 'Produit laitiers', product_group: 'yaourt', size_qty: 0.09, size_unit: 'kg', price: 900, unit_price: 10000, in_stock: true, suspect: null, first_seen_at: '2026-10-18T03:40:00Z', last_seen_at: new Date().toISOString(), last_changed_at: '2026-10-18T03:40:00Z', search_text: 'yaourt izi coco 90g' },
+    ]
+    if (req.headers()['prefer']?.includes('count')) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range', 'content-range': '0-1/2' }, body: '[]' })
+    const g = u.searchParams.get('product_group')
+    const q = u.searchParams.get('search_text')
+    return ok(all.filter((x) => (!g || g === 'eq.' + x.product_group) && (!q || x.search_text.includes(q.replace(/^ilike\.%|%$/g, '')))))
+  }
+  if (table === 'online_price_points') return ok([{ seen_on: '2026-10-17', price: 17000 }, { seen_on: '2026-10-18', price: 17500 }])
   if (path.startsWith('/rest/v1/rpc/')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
   return ok([])
 })
@@ -293,6 +306,17 @@ checks.myQuotes = await has('Ciment')
 await page.goto(B + '/lisitra')
 checks.lists = await page.locator('input[placeholder="Lisitra vaovao"]').waitFor({ timeout: 5000 }).then(() => true, () => false)
 await shot('41-lists')
+await page.goto(B + '/an-tserasera')
+checks.onlineList = await has('Riz Makalioka 5kg') && await has('3 500 Ar / kg')
+checks.onlineBadge = await has('Hita an-tserasera')
+await page.getByRole('tab', { name: 'Yaourt' }).click()
+checks.onlineFilter = await page.waitForFunction(() => document.body.innerText.includes('YAOURT IZI COCO') && !document.body.innerText.includes('Riz Makalioka'), null, { timeout: 5000 }).then(() => true, () => false)
+await page.getByText('YAOURT IZI COCO 90G').click()
+await page.waitForTimeout(300)
+await shot('42-online')
+await page.goto(B + '/admin')
+checks.onlineAdmin = await has('Fivarotana an-tserasera') && await has('BonMarche.mg')
+await shot('43-online-admin')
 console.log('CHECKS ' + JSON.stringify(checks))
 
 await page.goto(B + '/mombamomba')

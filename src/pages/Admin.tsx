@@ -4,6 +4,7 @@ import { median } from '../lib/stats'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import { ServerAdmin } from '../components/Shared'
+import { OnlineAdmin } from '../components/Online'
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { KPI, PageHeader, SyncStatus } from '../components/ui'
@@ -82,6 +83,7 @@ export default function Admin() {
       <PageHeader title={t('adminTitle')} />
       {s.role !== 'admin' && <div className="banner warn"><Icon name="shield" /> <div>{t('role')} : {t('roleUser')}. <button className="btn small" onClick={() => updateSettings({ role: 'admin' })}>{t('roleAdmin')}</button></div></div>}
       <ServerAdmin />
+      <OnlineAdmin />
       <label className="field"><span>{t('dataSource')}</span>
         <select value={s.dataSource} onChange={(e) => updateSettings({ dataSource: e.target.value as typeof s.dataSource })}>
           <option value="server">{t('srcServer')}</option><option value="hapi">{t('srcHapi')}</option>

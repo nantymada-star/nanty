@@ -88,6 +88,7 @@ input[type='checkbox'], input[type='radio'] { width: auto; min-height: 0; }
 .b-verified { background: var(--leaf); color: var(--green2); }
 .b-declared { background: var(--orange-soft); color: var(--orange); }
 .b-estimated { background: var(--blue-soft); color: var(--blue); }
+.b-online { background: var(--blue-soft); color: var(--blue); border: 1px solid var(--blue); }
 .b-stale { background: var(--soft); color: var(--muted); border: 1px dashed var(--muted); }
 .b-pending { background: var(--orange-soft); color: var(--orange); border: 1px dashed var(--orange); }
 .b-suspect { background: var(--red-soft); color: var(--red); }

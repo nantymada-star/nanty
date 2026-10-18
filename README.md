@@ -121,6 +121,29 @@ Projet Supabase : `aetwjbobrnrudmulvnjp` (URL et clé publique dans `src/lib/sup
 2. **Authentication → URL Configuration** : mettre l'adresse du site Cloudflare dans *Site URL* et ajouter `https://<votre-site>/kaonty` dans *Redirect URLs* (liens de confirmation et de mot de passe oublié).
 3. Facultatif : un serveur d'e-mails (SMTP) pour dépasser la limite d'envoi intégrée, et la protection contre les mots de passe compromis (Authentication → Policies).
 
+## Prix des boutiques en ligne (série 3 — `/an-tserasera`)
+
+Ajout pur : les prix PAM/WFP, leurs tables et leur synchronisation ne sont pas modifiés.
+
+- **Tables** : `online_shops` (boutiques et réglages), `online_products` (dernier prix affiché, contenance, prix au kg/L, rayon), `online_price_points` (un prix par produit et par jour). Lecture publique, écriture réservée à la fonction serveur.
+- **Fonction `sync-online`** (`supabase/functions/sync-online`) : chaque jour à 03:40 UTC (pg_cron), ou depuis Admin → « Fivarotana an-tserasera ».
+  - `kind = woocommerce` : API publique WooCommerce Store (`/wp-json/wc/store/v1/products`), aucune clé. Utilisé pour **BonMarche.mg**.
+  - `kind = apify` : lit le dernier jeu de données réussi d'une tâche Apify (secret `APIFY_TOKEN`). Prévu pour **KIBO** (site chargé en JavaScript) et **Supermarché.mg** (certificat TLS refusé par le serveur).
+- **Garde-fous** : prix en Ariary uniquement, entre 50 Ar et 50 M Ar ; électroménager exclu ; variation ×3 ou ÷3 marquée « suspecte » ; un prix non revu depuis 7 jours passe en « Tranainy ». Badge « Hita an-tserasera / Affiché en ligne », jamais « Voamarina ».
+- **Lien avec le PAM** : la fiche d'un produit PAM (riz, huile, haricots, maïs) affiche les produits emballés du même rayon, avec la mention qu'ils ne sont pas directement comparables au prix du marché.
+
+### Ajouter Apify (KIBO, Supermarché.mg)
+
+1. Créer un compte sur https://console.apify.com (offre gratuite).
+2. *Settings → API & Integrations* : copier le **Personal API token**.
+3. Supabase → *Edge Functions → Secrets* : ajouter `APIFY_TOKEN` = ce jeton (jamais dans le code ni dans le dépôt).
+4. Apify → *Store* → **Web Scraper** (`apify/web-scraper`) → *Create task*. Coller les réglages de `apify/task-kibo.json` (ou `task-supermarche-mg.json`), puis remplacer le champ *Page function* par le contenu de `apify/pageFunction.js`. Enregistrer.
+5. Lancer la tâche une fois (*Start*) et vérifier dans *Storage → Dataset* que les lignes ont un `name` et un `price` en Ar.
+6. *Schedules* → nouvelle planification quotidienne (par exemple 02:30 UTC) qui lance cette tâche.
+7. MadaPrice → Admin → « Fivarotana an-tserasera » : saisir l'identifiant de la tâche (`utilisateur~nom-de-tache`, visible dans l'URL de la tâche), cocher « Mandeha », puis cliquer sur le nom de la boutique pour une première collecte.
+
+Pour ajouter une autre boutique WooCommerce : `insert into online_shops (id, name, url, kind, config) values ('id', 'Nom', 'https://…', 'woocommerce', '{"categories":[…]}')` (identifiants des rayons : `/wp-json/wc/store/v1/products/categories`).
+
 ## Limites actuelles
 
 Sans compte, l'app fonctionne comme avant (données sur l'appareil). Restent à faire :

@@ -284,7 +284,7 @@ export function ServerAdmin() {
   const { data: users, reload: reloadUsers } = useServer<Profile[]>(() => (supabase && isStaff ? supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(200) : null), [isStaff])
   const { data: shops } = useServer<Business[]>(() => (supabase && isStaff ? supabase.from('businesses').select('*').order('verified').order('updated_at', { ascending: false }).limit(200) : null), [isStaff], ['businesses'])
   const { data: runs } = useServer<{ id: number; status: string; trigger: string; started_at: string; duration_ms: number | null; fetched: number; inserted: number; updated: number; error: string | null }[]>(
-    () => (supabase ? supabase.from('data_sync_runs').select('*').order('id', { ascending: false }).limit(10) : null), [], ['data_sync_runs'])
+    () => (supabase ? supabase.from('data_sync_runs').select('*').eq('source', 'wfp-hapi').order('id', { ascending: false }).limit(10) : null), [], ['data_sync_runs'])
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
