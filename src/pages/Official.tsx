@@ -4,7 +4,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { useT } from '../i18n'
 import { Icon } from '../components/Icon'
 import { Empty, PageHeader } from '../components/ui'
-import { OdrChain, OfficialBadge } from '../components/Odr'
+import { OdrChain, OdrWeekly, OfficialBadge } from '../components/Odr'
 import { supabase } from '../lib/supabase'
 import { useServer } from '../lib/useServer'
 import { fmtAr, fmtMonth, fmtPct } from '../lib/format'
@@ -57,6 +57,7 @@ export default function Official() {
         {ODR_PRODUCTS.map((p) => <button key={p} role="tab" aria-selected={product === p} className={`chip ${product === p ? 'on' : ''}`} onClick={() => set('p', p)}>{t(productKey(p))}</button>)}
       </div>
       {error && <div className="banner err">{error}</div>}
+      <OdrWeekly product={product} />
       {!rows.length ? (loading ? <div className="empty"><span className="spinner" /></div> : <Empty icon="shield">{t('odrNoData')}</Empty>) : <>
         <div className="card stack">
           <div className="row between wrap">

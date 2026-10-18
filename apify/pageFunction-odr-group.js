@@ -1,5 +1,5 @@
 // MadaPrice — robot Apify « Web Scraper » pour le groupe Google public de la cellule ODR (rapports de prix du riz).
-// Page du groupe : fait défiler la liste, met en file chaque discussion. Discussion : titre, date, texte et pièces jointes.
+// Page du groupe : fait défiler la liste, met en file chaque discussion. Discussion : titre, date et pièces jointes (pas le texte des messages).
 async function pageFunction(context) {
   const { request, log } = context
   const url = request.url
@@ -7,12 +7,13 @@ async function pageFunction(context) {
   if (/\/c\/[^/?#]+/.test(url)) {
     await context.waitFor(2000)
     const title = (document.querySelector('h1, [role="heading"][aria-level="1"], [role="heading"]') || {}).innerText || document.title
-    const text = (document.querySelector('[role="main"]') || document.body).innerText.slice(0, 30000)
+    // Date du premier message seulement : le texte des messages (noms, adresses) n'est pas conservé
+    const main = (document.querySelector('[role="main"]') || document.body).innerText
+    const posted = (main.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}, 20\d\d\b/) || [null])[0]
     const links = [...new Set([...document.querySelectorAll('a[href]')].map((a) => a.href)
       .filter((h) => /attachment|googleusercontent|drive\.google|docs\.google|\.pdf|\.xlsx?|\.docx?/i.test(h)))]
-    const dates = [...document.querySelectorAll('[data-tooltip], [title]')].map((e) => e.getAttribute('data-tooltip') || e.getAttribute('title')).filter((t) => /20\d\d/.test(t || '')).slice(0, 5)
     log.info(`Discussion : ${title}`)
-    return { kind: 'thread', url, title: title.trim(), dates, text, links }
+    return { kind: 'thread', url, title: title.trim(), posted, links }
   }
   // Liste : défilement pour charger les discussions plus anciennes
   const scroller = () => [...document.querySelectorAll('*')].filter((e) => e.scrollHeight > e.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(e).overflowY))

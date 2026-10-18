@@ -126,6 +126,13 @@ await page.route(SB + '/**', async (r) => {
     const pr = u.searchParams.get('product')
     return ok(all.filter((x) => !pr || pr === 'eq.' + x.product || (pr.startsWith('in.') && pr.includes(x.product))))
   }
+  if (table === 'odr_fiche_prices') {
+    const d = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10)
+    const F = (o) => ({ id: Math.random().toString(36), survey_date: d, region: 'Sava', district: 'Sambava', commune: null, market: 'Sambava Ville', product: 'riz_local', stage: 'detaillant', price: 2650, price_min: 2600, price_max: 2700, n_sellers: 3, varieties: ['Vary gasy'], thread_url: 'https://groups.google.com/g/cellule-odr-bdd-minae/c/x', ...o })
+    const all = [F({}), F({ market: 'Andapa Ville', price: 2550 }), F({ stage: 'grossiste', price: 2410 })]
+    const pr = u.searchParams.get('product')
+    return ok(all.filter((x) => !pr || pr === 'eq.' + x.product))
+  }
   if (table === 'online_price_points') return ok([{ seen_on: '2026-10-17', price: 17000 }, { seen_on: '2026-10-18', price: 17500 }])
   if (path.startsWith('/rest/v1/rpc/')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
   return ok([])
@@ -240,6 +247,7 @@ await shot('28-seasons')
 await page.goto(B + '/ofisialy')
 checks.odrChain = await has('2 476 Ar') && await has('2 702 Ar') && await has('2 828 Ar') && await has('Ofisialy · ODR')
 checks.odrMargin = await has('+226 Ar')
+checks.odrWeekly = await has('Fanadihadiana isan-kerinandro') && await has('2 600 Ar') && await has('2 410 Ar') && await has('tsena 2')
 await page.getByRole('tab', { name: 'Isam-distrika' }).click()
 checks.odrDistrict = await has('Ambatondrazaka')
 await shot('45-official')

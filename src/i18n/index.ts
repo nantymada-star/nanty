@@ -573,6 +573,16 @@ const M = {
   odrRegions: ['Isam-paritra', 'Par région'],
   odrNoData: ['Mbola tsy misy bulletin voaray.', 'Aucun bulletin importé pour l’instant.'],
   odrPeriod: ['Volana', 'Mois'],
+  // relevés hebdomadaires de terrain ODR (série 6)
+  odrWeekly: ['Fanadihadiana isan-kerinandro (ODR)', 'Relevés hebdomadaires (ODR)'],
+  odrWeeklyNote: [
+    "Vidiny voaangona isan-kerinandro eny an-tsena avy amin'ny mpanao fanadihadiana ODR isam-paritra (antonony amin'ny mpivarotra). Tsy voatahiry ny anaran'olona.",
+    'Prix relevés chaque semaine sur les marchés par les enquêteurs régionaux de l’ODR (médiane des vendeurs interrogés). Aucun nom de personne n’est conservé.',
+  ],
+  odrWeekOf: ['Herinandro {from} – {to}', 'Semaine du {from} au {to}'],
+  odrMarkets: ['tsena {n}', '{n} marché(s)'],
+  odrSource: ['Loharano', 'Source'],
+  odrWeeklyNone: ['Tsy misy fanadihadiana isan-kerinandro ho an\'ity vokatra ity.', 'Aucun relevé hebdomadaire pour ce produit.'],
 } as const satisfies Record<string, readonly [string, string]>
 
 export type MsgKey = keyof typeof M

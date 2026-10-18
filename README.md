@@ -160,6 +160,14 @@ Pour ajouter une autre boutique WooCommerce : `insert into online_shops (id, nam
 - **Dans l'application** : écran « Vidiny ofisialy » (chaîne producteur → grossiste → détaillant avec marges, historique, régions, districts, lien vers le PDF) et section sur la fiche riz et dans Comparer. Étiquette « Ofisialy · ODR ».
 - **Limite** : le rattachement district → région se fait d'après les marchés PAM ; une partie des districts n'a pas encore de région.
 
+## Relevés hebdomadaires de terrain ODR (série 6 — `/ofisialy`)
+
+- **Source** : groupe Google public de la cellule ODR (https://groups.google.com/g/cellule-odr-bdd-minae), où les points focaux régionaux déposent chaque semaine les fiches Excel du formulaire standard (feuilles Saisie_Producteurs, Saisie_Grossistes, Saisie_Detaillants). Plus récentes que les bulletins mensuels.
+- **Collecte** : tâche Apify `odr-groupe` (acteur Web Scraper, `apify/pageFunction-odr-group.js`, entrée `apify/input-odr-group.json`, robots.txt respecté) : liste des discussions, titre, date et liens des pièces jointes. Le texte des messages n'est pas conservé. Lancée chaque lundi à 03:20 UTC par la fonction `sync-odr-fiches` (`crawl`).
+- **Import** (`sync-odr-fiches`, `sync` toutes les 6 h) : nouvelles pièces jointes `.xlsx` → `odr_fiche_files`, puis lecture (SheetJS) de quelques fiches par appel → `odr_fiche_prices`. **Seuls les prix agrégés par marché, date, produit et étape sont stockés** (médiane, minimum, maximum, nombre de vendeurs, variétés) : les noms et téléphones des vendeurs et des enquêteurs présents dans les fiches ne sont jamais lus. Prix hors fourchette (paddy 300–8 000, riz 600–15 000 Ar/kg) et dates impossibles écartés.
+- **Dans l'application** : tableau « Relevés hebdomadaires » sur `/ofisialy` : dernière semaine de chaque région, médiane des marchés par étape, lien vers la discussion d'origine.
+- **Limite** : la feuille Producteurs n'est remplie que par certaines régions ; la colonne « riz importé » contient parfois une variété locale (« Stock »), comme saisie par l'enquêteur.
+
 ## Limites actuelles
 
 Sans compte, l'app fonctionne comme avant (données sur l'appareil). Restent à faire :
