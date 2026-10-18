@@ -50,14 +50,37 @@ async function collectWoo(shop: Shop): Promise<RawItem[]> {
   return [...byId.values()]
 }
 
-async function collectApify(shop: Shop): Promise<{ items: RawItem[]; note: string | null }> {
+function apifyAuth() {
   const token = Deno.env.get('APIFY_TOKEN')
   if (!token) throw new Error('Secret APIFY_TOKEN manquant (Supabase > Edge Functions > Secrets)')
-  const task = shop.config.task as string | undefined
+  return { Authorization: `Bearer ${token}` }
+}
+
+/** Tâches Apify du compte (identifiant « utilisateur~nom »). */
+async function listApifyTasks() {
+  const r = await getJson('https://api.apify.com/v2/actor-tasks?limit=100&desc=1', apifyAuth())
+  // deno-lint-ignore no-explicit-any
+  return ((r?.data?.items ?? []) as any[]).map((t) => ({ id: t.id as string, task: `${t.username}~${t.name}`, name: t.name as string, modifiedAt: t.modifiedAt as string }))
+}
+
+/** Tâche de la boutique : config.task, sinon la tâche dont le nom contient l'identifiant de la boutique (enregistrée ensuite). */
+// deno-lint-ignore no-explicit-any
+async function resolveTask(db: any, shop: Shop): Promise<string> {
+  if (shop.config.task) return shop.config.task as string
+  const key = shop.id.split('-')[0]
+  const found = (await listApifyTasks()).find((t) => t.name.toLowerCase().includes(key))
+  if (!found) throw new Error(`Aucune tâche Apify dont le nom contient « ${key} » (config.task à renseigner)`)
+  shop.config = { ...shop.config, task: found.task }
+  await db.from('online_shops').update({ config: shop.config }).eq('id', shop.id)
+  return found.task
+}
+
+// deno-lint-ignore no-explicit-any
+async function collectApify(db: any, shop: Shop): Promise<{ items: RawItem[]; note: string | null }> {
+  const auth = apifyAuth()
   const actor = shop.config.actor as string | undefined
-  if (!task && !actor) throw new Error('Tâche Apify non renseignée pour cette boutique (config.task)')
+  const task = actor ? undefined : await resolveTask(db, shop)
   const base = task ? `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}` : `https://api.apify.com/v2/acts/${encodeURIComponent(actor!)}`
-  const auth = { Authorization: `Bearer ${token}` }
   const run = await getJson(`${base}/runs/last?status=SUCCEEDED`, auth)
   const ds = run?.data?.defaultDatasetId
   if (!ds) throw new Error('Aucune exécution Apify réussie pour cette tâche')
@@ -83,7 +106,7 @@ async function syncShop(db: any, shop: Shop, trigger: string) {
     let raw: RawItem[]
     let note: string | null = null
     if (shop.kind === 'woocommerce') raw = await collectWoo(shop)
-    else ({ items: raw, note } = await collectApify(shop))
+    else ({ items: raw, note } = await collectApify(db, shop))
 
     const products = new Map<string, OnlineProduct>()
     let rejected = 0
@@ -163,6 +186,40 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}))
   const only = typeof body?.shop === 'string' ? body.shop : null
+
+  // Pilotage d'Apify : liste des tâches, lancement d'une collecte, état de la dernière exécution
+  try {
+    if (body?.action === 'apify-tasks') return json({ ok: true, tasks: await listApifyTasks() })
+    if ((body?.action === 'apify-start' || body?.action === 'apify-status') && only) {
+      const { data: shop } = await db.from('online_shops').select('id, name, url, kind, config, enabled').eq('id', only).single()
+      if (!shop || shop.kind !== 'apify') return json({ ok: false, error: 'boutique Apify inconnue' }, 404)
+      const task = await resolveTask(db, shop as Shop)
+      const url = `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}/runs`
+      if (body.action === 'apify-start') {
+        // Entrée fournie (apify/input-*.json) : enregistrée dans la tâche, pour les lancements planifiés aussi
+        if (body.input && typeof body.input === 'object') {
+          const put = await fetch(`https://api.apify.com/v2/actor-tasks/${encodeURIComponent(task)}/input`, {
+            method: 'PUT', headers: { ...apifyAuth(), 'Content-Type': 'application/json', 'User-Agent': UA }, body: JSON.stringify(body.input),
+          })
+          if (!put.ok) return json({ ok: false, error: `Mise à jour de la tâche : HTTP ${put.status} ${(await put.text()).slice(0, 200)}` }, 502)
+        }
+        const res = await fetch(url, { method: 'POST', headers: { ...apifyAuth(), 'Content-Type': 'application/json', 'User-Agent': UA }, body: '{}' })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) return json({ ok: false, error: j?.error?.message ?? `HTTP ${res.status}` }, 502)
+        return json({ ok: true, task, run: { id: j.data?.id, status: j.data?.status, startedAt: j.data?.startedAt } })
+      }
+      const last = await getJson(`${url}/last`, apifyAuth())
+      const d = last?.data ?? {}
+      let items: number | null = null
+      if (d.defaultDatasetId) {
+        const info = await getJson(`https://api.apify.com/v2/datasets/${d.defaultDatasetId}`, apifyAuth())
+        items = info?.data?.itemCount ?? null
+      }
+      return json({ ok: true, task, run: { id: d.id, status: d.status, startedAt: d.startedAt, finishedAt: d.finishedAt, items, stats: { requestsFinished: d.stats?.requestsFinished, requestsFailed: d.stats?.requestsFailed } } })
+    }
+  } catch (e) {
+    return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500)
+  }
   let q = db.from('online_shops').select('id, name, url, kind, config, enabled').order('id')
   q = only ? q.eq('id', only) : q.eq('enabled', true)
   const { data: shops, error } = await q
