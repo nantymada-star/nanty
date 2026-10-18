@@ -159,10 +159,12 @@ Deno.serve(async (req) => {
 
     // Lignes déjà connues sur la même période : lues par pages (une liste d'id dans l'URL dépasserait sa longueur max)
     const byId = new Map<string, { id: string; price: number; first_seen_at: string; last_verified_at: string; revisions: unknown[] | null }>()
+    // HDX renvoie aussi les périodes qui chevauchent startDate : on part de la plus ancienne date reçue
+    const minStart = rows.reduce((m, r) => ((r.period_start as string) < m ? (r.period_start as string) : m), startDate)
     for (let from = 0; ; from += 1000) {
       const { data: page, error: e1 } = await db.from('price_observations')
         .select('id, price, first_seen_at, last_verified_at, revisions')
-        .eq('source', 'wfp-hapi').gte('period_start', startDate).order('id').range(from, from + 999)
+        .eq('source', 'wfp-hapi').gte('period_start', minStart).order('id').range(from, from + 999)
       if (e1) throw e1
       for (const x of page ?? []) byId.set(x.id, x)
       if (!page || page.length < 1000) break
