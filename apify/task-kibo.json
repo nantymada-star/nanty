@@ -1,17 +1,33 @@
 {
-  "startUrls": [{ "url": "https://www.kibo.mg/" }],
+  "runMode": "PRODUCTION",
+  "respectRobotsTxtFile": true,
+  "startUrls": [
+    {
+      "url": "https://www.kibo.mg/"
+    }
+  ],
   "linkSelector": "a[href]",
   "globs": [
-    { "glob": "https://www.kibo.mg/*[0-9]-*" },
-    { "glob": "https://www.kibo.mg/*?page=*" }
+    {
+      "glob": "https://www.kibo.mg/*[0-9]-*"
+    },
+    {
+      "glob": "https://www.kibo.mg/*?page=*"
+    }
   ],
   "excludes": [
-    { "glob": "https://www.kibo.mg/*{order,tag,id_currency,search_query,back,controller}=*" },
-    { "glob": "https://www.kibo.mg/*.{jpg,png,css,js}" }
+    {
+      "glob": "https://www.kibo.mg/*{order,tag,id_currency,search_query,back,controller}=*"
+    },
+    {
+      "glob": "https://www.kibo.mg/*.{jpg,png,css,js}"
+    }
   ],
   "pageFunction": "// coller ici le contenu de apify/pageFunction.js",
   "injectJQuery": true,
   "maxRequestsPerCrawl": 3000,
   "maxConcurrency": 2,
-  "proxyConfiguration": { "useApifyProxy": true }
+  "proxyConfiguration": {
+    "useApifyProxy": true
+  }
 }

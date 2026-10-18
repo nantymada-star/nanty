@@ -1,4 +1,6 @@
 {
+  "runMode": "PRODUCTION",
+  "respectRobotsTxtFile": true,
   "startUrls": [
     {
       "url": "https://supermarche.mg/boutique/"
