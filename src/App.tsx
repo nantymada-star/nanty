@@ -37,6 +37,7 @@ const Account = lazy(() => import('./pages/Account'))
 const Lists = lazy(() => import('./pages/Lists'))
 const Quotes = lazy(() => import('./pages/Quotes'))
 const Online = lazy(() => import('./pages/Online'))
+const Official = lazy(() => import('./pages/Official'))
 
 /** Planification : au démarrage, toutes les N minutes, au retour du réseau et au retour sur l'onglet. */
 function useAutoSync() {
@@ -155,6 +156,7 @@ function Shell() {
             <Route path="/lisitra" element={<Lists />} />
             <Route path="/devis" element={<Quotes />} />
             <Route path="/an-tserasera" element={<Online />} />
+            <Route path="/ofisialy" element={<Official />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>

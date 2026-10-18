@@ -550,6 +550,29 @@ const M = {
   kOnline: ['Vidiny an-tserasera latsaka', 'Prix en ligne sous'],
   onlineAlertNote: ["Ny fanairana « an-tserasera » dia foronina avy amin'ny pejin'ny vokatra an-tserasera.", 'Les alertes « en ligne » se créent depuis la fiche d’un produit en ligne.'],
   offlineCopy: ['Tsy misy Internet — kopia voatahiry no aseho', 'Hors ligne — copie locale affichée'],
+  // prix officiels du riz (Observatoire du Riz, série 5)
+  odrTitle: ["Vidin'ny vary ofisialy (ODR)", 'Prix officiels du riz (ODR)'],
+  odrShort: ['Vidiny ofisialy', 'Prix officiels'],
+  odrNote: [
+    "Vidiny navoakan'ny Observatoire du Riz (Ministeran'ny Fambolena) isam-bolana : mpamokatra, mpivarotra ambongadiny ary antsinjarany, isam-paritra sy isam-distrika.",
+    'Prix publiés chaque mois par l’Observatoire du Riz (ministère de l’Agriculture) : producteur, grossiste et détaillant, par région et par district.',
+  ],
+  stOfficial: ['Ofisialy', 'Officiel'],
+  stOfficialHelp: ["Navoakan'ny sampan-draharaham-panjakana (bulletin ODR)", 'Publié par un service public (bulletin ODR)'],
+  odr_paddy: ['Akotry (paddy)', 'Paddy'],
+  odr_riz_local: ['Vary fotsy gasy', 'Riz blanc local'],
+  odr_riz_importe: ['Vary fotsy avy any ivelany', 'Riz blanc importé'],
+  odr_producteur: ['Mpamokatra', 'Producteur'],
+  odr_grossiste: ['Ambongadiny', 'Grossiste'],
+  odr_detaillant: ['Antsinjarany', 'Détaillant'],
+  odrNational: ['Madagasikara manontolo', 'Ensemble du pays'],
+  odrChain: ["Mpamokatra → ambongadiny → antsinjarany", 'Du producteur au détaillant'],
+  odrMargin: ['Elanelana', 'Marge'],
+  odrBulletin: ['Bulletin ODR', 'Bulletin ODR'],
+  odrDistricts: ['Isam-distrika', 'Par district'],
+  odrRegions: ['Isam-paritra', 'Par région'],
+  odrNoData: ['Mbola tsy misy bulletin voaray.', 'Aucun bulletin importé pour l’instant.'],
+  odrPeriod: ['Volana', 'Mois'],
 } as const satisfies Record<string, readonly [string, string]>
 
 export type MsgKey = keyof typeof M

@@ -5,6 +5,7 @@ import { Empty, PageHeader, SeriesRow, SyncStatus, useFreshness } from '../compo
 import { useData } from '../lib/data'
 import { CommodityEnrichment } from '../components/Enrichment'
 import { OnlineForCommodity } from '../components/Online'
+import { OdrForCommodity } from '../components/Odr'
 import { useSettings } from '../lib/settings'
 import { haversineKm, summarize } from '../lib/stats'
 import { categoryLabel, commodityLabel, priceTypeLabel, unitLabel } from '../lib/commodities'
@@ -120,6 +121,7 @@ export default function Compare() {
       )}
       <small>{t('comparableNote')}</small>
       {com && <CommodityEnrichment commodityName={com.name} />}
+      {com && <OdrForCommodity code={com.code} region={region || undefined} />}
       {com && <OnlineForCommodity code={com.code} />}
       {sort === 'profit' && <div className="banner info">{t('gapHelp')} <Link className="btn small" to="/faritra">{t('qRegions')}</Link></div>}
 

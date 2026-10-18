@@ -114,6 +114,18 @@ await page.route(SB + '/**', async (r) => {
     return ok(all.filter((x) => (!g || g === 'eq.' + x.product_group) && (!q || x.search_text.includes(q.replace(/^ilike\.%|%$/g, '')))))
   }
   if (table === 'online_matches') return ok([{ match_key: 'n:makalioka riz|5kg', name: 'Riz Makalioka 5kg', barcode: null, size_qty: 5, size_unit: 'kg', product_group: 'riz', shops: 2, offers: 2, min_price: 16900, max_price: 17500, last_seen_at: new Date().toISOString() }])
+  if (table === 'odr_prices') {
+    const R = (o) => ({ id: Math.random().toString(36), bulletin_no: 49, bulletin_url: 'https://www.miasa.gov.mg/x.pdf', period_start: '2025-06-01', level: 'national', area: 'Madagascar', region: null, product: 'riz_local', stage: 'grossiste', price: 2702, change_pct: -7.2, ...o })
+    const all = [
+      R({ stage: 'producteur', price: 2476 }), R({}), R({ stage: 'detaillant', price: 2828 }),
+      R({ period_start: '2025-05-01', stage: 'producteur', price: 2600 }), R({ period_start: '2025-05-01', price: 2900 }), R({ period_start: '2025-05-01', stage: 'detaillant', price: 3050 }),
+      R({ level: 'region', area: 'Analamanga', region: 'Analamanga', price: 3035 }), R({ level: 'region', area: 'Analamanga', region: 'Analamanga', stage: 'detaillant', price: 3315 }),
+      R({ level: 'district', area: 'Ambatondrazaka', region: 'Alaotra-Mangoro', price: 2533 }),
+      R({ product: 'paddy', stage: 'producteur', price: 1594 }),
+    ]
+    const pr = u.searchParams.get('product')
+    return ok(all.filter((x) => !pr || pr === 'eq.' + x.product || (pr.startsWith('in.') && pr.includes(x.product))))
+  }
   if (table === 'online_price_points') return ok([{ seen_on: '2026-10-17', price: 17000 }, { seen_on: '2026-10-18', price: 17500 }])
   if (path.startsWith('/rest/v1/rpc/')) return r.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } })
   return ok([])
@@ -225,6 +237,12 @@ await page.waitForTimeout(400)
 checks.seasonRange = await has('Vidiny tombanana')
 await page.getByRole('button', { name: /Ampandreneso aho/ }).click()
 await shot('28-seasons')
+await page.goto(B + '/ofisialy')
+checks.odrChain = await has('2 476 Ar') && await has('2 702 Ar') && await has('2 828 Ar') && await has('Ofisialy · ODR')
+checks.odrMargin = await has('+226 Ar')
+await page.getByRole('tab', { name: 'Isam-distrika' }).click()
+checks.odrDistrict = await has('Ambatondrazaka')
+await shot('45-official')
 await page.goto(B + '/fanairana')
 await page.getByRole('button', { name: /Ny fanairako/ }).click()
 await page.locator('select').last().selectOption('stock').catch(() => {})

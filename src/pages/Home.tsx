@@ -55,6 +55,7 @@ export default function Home() {
     ['/mpivarotra', 'store', 'qMerchant'],
     ['/tantarako', 'refresh', 'historyTitle'],
     ['/fanampiny', 'globe', 'enrichTitle'],
+    ['/ofisialy', 'shield', 'odrShort'],
     ['/an-tserasera', 'store', 'onlineTitle'],
     ['/admin', 'settings', 'qAdmin'],
   ]
