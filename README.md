@@ -152,6 +152,14 @@ Ajout pur : les prix PAM/WFP, leurs tables et leur synchronisation ne sont pas m
 
 Pour ajouter une autre boutique WooCommerce : `insert into online_shops (id, name, url, kind, config) values ('id', 'Nom', 'https://…', 'woocommerce', '{"categories":[…]}')` (identifiants des rayons : `/wp-json/wc/store/v1/products/categories`).
 
+## Prix officiels du riz (série 5 — `/ofisialy`)
+
+- **Source** : bulletins mensuels de l'Observatoire du Riz (ODR, ministère de l'Agriculture), PDF publiés sur https://www.miasa.gov.mg (catégorie « Bulletins d'information › ODR »).
+- **Contenu** : prix du paddy au producteur ; riz blanc local au producteur, au grossiste et au détaillant ; riz importé au grossiste et au détaillant ; par région (tableau 1), par district et pour l'ensemble du pays.
+- **Fonction `sync-odr`** : découvre les bulletins, lit le texte du PDF (unpdf), reconnaît les deux mises en page connues (milliers séparés ou non), enregistre `odr_prices` (historique, date de première réception, révisions) et `odr_bulletins`. Un bulletin par appel (limite mémoire). Tâche planifiée chaque jour à 04:10 UTC.
+- **Dans l'application** : écran « Vidiny ofisialy » (chaîne producteur → grossiste → détaillant avec marges, historique, régions, districts, lien vers le PDF) et section sur la fiche riz et dans Comparer. Étiquette « Ofisialy · ODR ».
+- **Limite** : le rattachement district → région se fait d'après les marchés PAM ; une partie des districts n'a pas encore de région.
+
 ## Limites actuelles
 
 Sans compte, l'app fonctionne comme avant (données sur l'appareil). Restent à faire :
