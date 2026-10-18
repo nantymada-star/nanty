@@ -196,6 +196,29 @@ Deno.serve(async (req) => {
   // Pilotage d'Apify : liste des tâches, lancement d'une collecte, état de la dernière exécution
   try {
     if (body?.action === 'apify-tasks') return json({ ok: true, tasks: await listApifyTasks() })
+    // Tâches Apify hors boutiques (ex. groupe Google de l'ODR) : création ou mise à jour, lancement, état, lecture du jeu de données
+    if (body?.action === 'apify-task-upsert' && typeof body.name === 'string' && body.input) {
+      const found = (await listApifyTasks()).find((t) => t.name === body.name)
+      const headers = { ...apifyAuth(), 'Content-Type': 'application/json', 'User-Agent': UA }
+      const res = found
+        ? await fetch(`https://api.apify.com/v2/actor-tasks/${found.id}/input`, { method: 'PUT', headers, body: JSON.stringify(body.input) })
+        : await fetch('https://api.apify.com/v2/actor-tasks', { method: 'POST', headers, body: JSON.stringify({ actId: body.actor ?? 'apify~web-scraper', name: body.name, input: body.input }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) return json({ ok: false, error: j?.error?.message ?? `HTTP ${res.status}` }, 502)
+      return json({ ok: true, created: !found, id: found?.id ?? j?.data?.id })
+    }
+    if (body?.action === 'apify-task-run' && typeof body.task === 'string') {
+      const res = await fetch(`https://api.apify.com/v2/actor-tasks/${encodeURIComponent(body.task)}/runs`, { method: 'POST', headers: { ...apifyAuth(), 'Content-Type': 'application/json', 'User-Agent': UA }, body: '{}' })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) return json({ ok: false, error: j?.error?.message ?? `HTTP ${res.status}` }, 502)
+      return json({ ok: true, run: { id: j.data?.id, status: j.data?.status } })
+    }
+    if (body?.action === 'apify-task-items' && typeof body.task === 'string') {
+      const last = await getJson(`https://api.apify.com/v2/actor-tasks/${encodeURIComponent(body.task)}/runs/last`, apifyAuth())
+      const d = last?.data ?? {}
+      const items = d.defaultDatasetId ? await getJson(`https://api.apify.com/v2/datasets/${d.defaultDatasetId}/items?clean=true&format=json&limit=${Math.min(Number(body.limit ?? 50), 500)}&offset=${Number(body.offset ?? 0)}`, apifyAuth()) : []
+      return json({ ok: true, run: { id: d.id, status: d.status, startedAt: d.startedAt, finishedAt: d.finishedAt }, items })
+    }
     if ((body?.action === 'apify-start' || body?.action === 'apify-status') && only) {
       const { data: shop } = await db.from('online_shops').select('id, name, url, kind, config, enabled').eq('id', only).single()
       if (!shop || shop.kind !== 'apify') return json({ ok: false, error: 'boutique Apify inconnue' }, 404)

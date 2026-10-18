@@ -1,0 +1,20 @@
+{
+  "runMode": "PRODUCTION",
+  "respectRobotsTxtFile": true,
+  "startUrls": [
+    {
+      "url": "https://groups.google.com/g/cellule-odr-bdd-minae"
+    }
+  ],
+  "linkSelector": "",
+  "pageFunction": "// MadaPrice — robot Apify « Web Scraper » pour le groupe Google public de la cellule ODR (rapports de prix du riz).\n// Page du groupe : fait défiler la liste, met en file chaque discussion. Discussion : titre, date, texte et pièces jointes.\nasync function pageFunction(context) {\n  const { request, log } = context\n  const url = request.url\n  await context.waitFor(3000)\n  if (/\\/c\\/[^/?#]+/.test(url)) {\n    await context.waitFor(2000)\n    const title = (document.querySelector('h1, [role=\"heading\"][aria-level=\"1\"], [role=\"heading\"]') || {}).innerText || document.title\n    const text = (document.querySelector('[role=\"main\"]') || document.body).innerText.slice(0, 30000)\n    const links = [...new Set([...document.querySelectorAll('a[href]')].map((a) => a.href)\n      .filter((h) => /attachment|googleusercontent|drive\\.google|docs\\.google|\\.pdf|\\.xlsx?|\\.docx?/i.test(h)))]\n    const dates = [...document.querySelectorAll('[data-tooltip], [title]')].map((e) => e.getAttribute('data-tooltip') || e.getAttribute('title')).filter((t) => /20\\d\\d/.test(t || '')).slice(0, 5)\n    log.info(`Discussion : ${title}`)\n    return { kind: 'thread', url, title: title.trim(), dates, text, links }\n  }\n  // Liste : défilement pour charger les discussions plus anciennes\n  const scroller = () => [...document.querySelectorAll('*')].filter((e) => e.scrollHeight > e.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(e).overflowY))\n  for (let i = 0; i < 20; i++) {\n    window.scrollTo(0, document.body.scrollHeight)\n    for (const s of scroller()) s.scrollTop = s.scrollHeight\n    await context.waitFor(1500)\n  }\n  const threads = [...new Set([...document.querySelectorAll('a[href*=\"/c/\"]')].map((a) => a.href.split(/[?#]/)[0]))]\n    .filter((h) => /\\/g\\/cellule-odr-bdd-minae\\/c\\//.test(h))\n  for (const t of threads) await context.enqueueRequest({ url: t })\n  log.info(`${threads.length} discussion(s) trouvée(s)`)\n  return { kind: 'list', url, count: threads.length, threads }\n}\n",
+  "injectJQuery": false,
+  "waitUntil": [
+    "networkidle2"
+  ],
+  "maxRequestsPerCrawl": 300,
+  "maxConcurrency": 2,
+  "proxyConfiguration": {
+    "useApifyProxy": true
+  }
+}
